@@ -1,0 +1,13 @@
+root:
+  strlist:
+    - one
+    - two
+    - three
+  int: 1
+  nested:
+    root:
+      strlist:
+        - four
+        - five
+        - six
+      int: 2
