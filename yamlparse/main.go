@@ -20,13 +20,13 @@ type Example struct {
 func test(fpath string) error {
 	f, err := os.Open(fpath)
 	if err != nil {
-		return fmt.Errorf("Could not open %s\n", fpath)
+		return err
 	}
 
 	var data Example
 	decoder := yaml.NewDecoder(f)
 	if err := decoder.Decode(&data); err != nil {
-		return fmt.Errorf("Could not decode %s\n", fpath)
+		return err
 	}
 
 	b, err := yaml.Marshal(&data)
