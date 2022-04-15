@@ -31,7 +31,7 @@ func (p *Player) Start() error {
 			case <-tick:
 				p.Update()
 			case m := <-*p.in:
-				fmt.Print(m)
+				p.message(m)
 			case <-p.done:
 				break
 			}
@@ -69,9 +69,10 @@ func (p *Player) Chan(in *<-chan game.Message, out *chan<- game.Message) {
 	p.out = out
 }
 
-func (p *Player) message(m any) error {
-	switch t := m.(type) {
+func (p *Player) message(m game.Message) error {
+	switch t := m.Data.(type) {
 	case game.WorldState:
+		fmt.Printf("player %s setting world state\n", p.uuid)
 		p.world = t
 	}
 
