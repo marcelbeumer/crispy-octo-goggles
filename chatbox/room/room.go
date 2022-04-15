@@ -3,7 +3,6 @@ package room
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
@@ -11,8 +10,6 @@ import (
 
 type Room struct {
 	uuid   string
-	ctime  time.Time // current
-	ptime  time.Time // previous
 	ch     chan chatbox.Event
 	done   chan struct{}
 	userCh map[string]chan chatbox.Event

@@ -3,7 +3,6 @@ package user
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
@@ -12,8 +11,6 @@ import (
 type User struct {
 	uuid         string
 	initialState chatbox.UserState
-	ctime        time.Time // current
-	ptime        time.Time // previous
 	in           *<-chan chatbox.Event
 	out          *chan<- chatbox.Event
 	done         chan struct{}
