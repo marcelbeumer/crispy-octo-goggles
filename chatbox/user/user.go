@@ -25,9 +25,10 @@ func (u *User) Start() error {
 	}
 	u.done = make(chan struct{})
 	go (func() {
+		in := *u.in
 		for {
 			select {
-			case e := <-*u.in:
+			case e := <-in:
 				if err := u.handleEvent(e); err != nil {
 					fmt.Println(err)
 				}

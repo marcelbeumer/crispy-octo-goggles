@@ -3,6 +3,7 @@ package room
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
@@ -14,6 +15,7 @@ type Room struct {
 	done   chan struct{}
 	userCh map[string]chan chatbox.Event
 	state  chatbox.RoomState
+	l      *sync.RWMutex
 }
 
 func (r *Room) Start() error {
@@ -44,7 +46,11 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
+
+		r.l.Lock()
 		r.state.Users[uuid] = data
+		r.l.Unlock()
+
 		m := chatbox.UserRef{Uuid: uuid, State: data}
 		ne, err := chatbox.NewEvent(chatbox.NewUser, m, r.uuid)
 		if err != nil {
@@ -57,9 +63,13 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
+
+		r.l.Lock()
 		name := r.state.Users[uuid].Name
 		msg := chatbox.Message{Sender: e.Sender, SenderName: name, Message: data}
 		r.state.Messages = append(r.state.Messages, msg)
+		r.l.Unlock()
+
 		n1, err := chatbox.NewEvent(chatbox.RoomStateUpdate, r.state, r.uuid)
 		if err != nil {
 			return err
@@ -102,11 +112,13 @@ func (r *Room) AddUser(p chatbox.User) error {
 		return errors.New("user already added")
 	}
 
+	r.l.Lock()
 	uuid := p.Uuid()
 	r.state.Users[uuid] = chatbox.UserState{}
-
 	userCh := make(chan chatbox.Event)
 	r.userCh[uuid] = userCh
+	r.l.Unlock()
+
 	in := (<-chan chatbox.Event)(userCh)
 	out := (chan<- chatbox.Event)(r.ch)
 
@@ -133,6 +145,7 @@ func NewRoom() *Room {
 		},
 		userCh: make(map[string]chan chatbox.Event),
 		uuid:   "room:" + uuid.NewString(),
+		l:      &sync.RWMutex{},
 	}
 }
 

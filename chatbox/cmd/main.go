@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
@@ -13,12 +14,12 @@ func main() {
 	room.Start()
 
 	go func() {
-		voyeur := user.NewUser(chatbox.UserState{Name: "Voyeur", Status: chatbox.StatusOffline})
-		voyeur.CanPrint = true
-		if err := voyeur.Start(); err != nil {
+		admin := user.NewUser(chatbox.UserState{Name: "Admin", Status: chatbox.StatusBusy})
+		admin.CanPrint = true
+		if err := admin.Start(); err != nil {
 			panic(err)
 		}
-		if err := room.AddUser(voyeur); err != nil {
+		if err := room.AddUser(admin); err != nil {
 			panic(err)
 		}
 
@@ -48,6 +49,17 @@ func main() {
 
 		kyle.SendMessage("Hello John")
 		john.SendMessage("Hi Kyle")
+
+		for x := 3; x > 0; x-- {
+			msg := fmt.Sprintf("I've heard the room will self destruct in %d...", x)
+			admin.SendMessage(msg)
+			time.Sleep(time.Second)
+		}
+
+		// admin.WaitDone()
+		// kyle.WaitDone()
+		// john.WaitDone()
+		room.Stop()
 	}()
 
 	room.WaitDone()
