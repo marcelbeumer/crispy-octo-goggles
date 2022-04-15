@@ -16,6 +16,7 @@ type User struct {
 	out          *chan<- chatbox.Event
 	done         chan struct{}
 	room         chatbox.RoomState
+	CanPrint     bool
 }
 
 func (u *User) Start() error {
@@ -91,9 +92,9 @@ func (u *User) handleEvent(e chatbox.Event) error {
 		}
 		name := data.State.Name
 		if data.Uuid == u.uuid {
-			name = "you"
+			name = fmt.Sprintf("%s (you)", name)
 		}
-		fmt.Printf(
+		u.printf(
 			"[%s] << %s entered the room >>\n",
 			time.Now().Local(),
 			name,
@@ -104,13 +105,20 @@ func (u *User) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("[%s %s] %s\n", time.Now().Local(), data.SenderName, data.Message)
+		u.printf("[%s %s] %s\n", time.Now().Local(), data.SenderName, data.Message)
 
 	default:
 		return chatbox.UhandledEventError{Event: e, Receiver: u.uuid}
 	}
 
 	return nil
+}
+
+func (u *User) printf(format string, a ...any) {
+	if u.CanPrint {
+		s := fmt.Sprintf(format, a...)
+		fmt.Print(s)
+	}
 }
 
 func NewUser(initialState chatbox.UserState) *User {
