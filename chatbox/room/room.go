@@ -122,7 +122,7 @@ func (r *Room) AddUser(p chatbox.User) error {
 	in := (<-chan chatbox.Event)(userCh)
 	out := (chan<- chatbox.Event)(r.ch)
 
-	p.Chan(&in, &out)
+	p.Chan(in, out)
 	userCh <- chatbox.Event{Sender: r.uuid, Name: chatbox.RequestInitialUserState}
 
 	return nil

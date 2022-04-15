@@ -12,8 +12,8 @@ import (
 type User struct {
 	uuid         string
 	initialState chatbox.UserState
-	in           *<-chan chatbox.Event
-	out          *chan<- chatbox.Event
+	in           <-chan chatbox.Event
+	out          chan<- chatbox.Event
 	done         chan struct{}
 	room         chatbox.RoomState
 	CanPrint     bool
@@ -25,7 +25,7 @@ func (u *User) Start() error {
 	}
 	u.done = make(chan struct{})
 	go (func() {
-		in := *u.in
+		in := u.in
 		for {
 			select {
 			case e := <-in:
@@ -56,7 +56,7 @@ func (u *User) Uuid() string {
 	return u.uuid
 }
 
-func (u *User) Chan(in *<-chan chatbox.Event, out *chan<- chatbox.Event) {
+func (u *User) Chan(in <-chan chatbox.Event, out chan<- chatbox.Event) {
 	u.in = in
 	u.out = out
 }
@@ -66,7 +66,7 @@ func (u *User) SendMessage(m string) {
 	if err != nil {
 		panic(err)
 	}
-	*u.out <- e
+	u.out <- e
 }
 
 func (u *User) handleEvent(e chatbox.Event) error {
@@ -77,7 +77,7 @@ func (u *User) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
-		*u.out <- e
+		u.out <- e
 
 	case chatbox.RoomStateUpdate:
 		data, err := chatbox.GetData[chatbox.RoomState](e)

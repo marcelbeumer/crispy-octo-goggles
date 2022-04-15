@@ -98,7 +98,7 @@ type UserRef struct {
 
 type User interface {
 	Uuid() string
-	Chan(in *<-chan Event, out *chan<- Event)
+	Chan(in <-chan Event, out chan<- Event)
 }
 
 type EventError struct {
