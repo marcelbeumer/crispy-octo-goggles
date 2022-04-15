@@ -24,13 +24,10 @@ func (u *User) Start() error {
 	if u.done != nil {
 		return errors.New("already started")
 	}
-	tick := time.Tick(16 * time.Millisecond)
 	u.done = make(chan struct{})
 	go (func() {
 		for {
 			select {
-			case <-tick:
-				u.Update()
 			case e := <-*u.in:
 				if err := u.handleEvent(e); err != nil {
 					fmt.Println(err)
@@ -53,14 +50,6 @@ func (u *User) Stop() error {
 
 func (u *User) WaitDone() {
 	_ = <-u.done
-}
-
-func (u *User) Update() {
-	u.ptime = u.ctime
-	u.ctime = time.Now()
-	// for _, user := range w.users {
-	// 	user.In <- UserUpdateMessage{}
-	// }
 }
 
 func (u *User) Uuid() string {

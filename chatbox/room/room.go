@@ -23,13 +23,10 @@ func (r *Room) Start() error {
 	if r.done != nil {
 		return errors.New("already started")
 	}
-	tick := time.Tick(16 * time.Millisecond)
 	r.done = make(chan struct{})
 	go (func() {
 		for {
 			select {
-			case <-tick:
-				r.Update()
 			case e := <-r.ch:
 				if err := r.handleEvent(e); err != nil {
 					fmt.Println(err)
@@ -68,11 +65,6 @@ func (r *Room) Stop() error {
 
 func (r *Room) WaitDone() {
 	_ = <-r.done
-}
-
-func (r *Room) Update() {
-	r.ptime = r.ctime
-	r.ctime = time.Now()
 }
 
 func (r *Room) HasUser(uuid string) bool {
