@@ -1,32 +1,15 @@
 package main
 
 import (
-	"time"
+	"github.com/marcelbeumer/crispy-octo-goggles/racingsim/player"
+	"github.com/marcelbeumer/crispy-octo-goggles/racingsim/world"
 )
 
-type WorldTime struct {
-}
-
-type World struct {
-	ctime time.Time // current
-	ptime time.Time // previous
-}
-
-func (w World) Start() {
-	tick := time.Tick(16 * time.Millisecond)
-	for {
-		select {
-		case <-tick:
-			w.Update()
-		}
-	}
-}
-
-func (w World) Update() {
-	w.ptime = w.ctime
-	w.ctime = time.Now()
-}
-
 func main() {
-	World{}.Start()
+	w := world.NewWorld()
+	w.Start()
+	p := player.NewPlayer()
+	p.Start()
+	w.AddPlayer(p)
+	w.WaitDone()
 }
