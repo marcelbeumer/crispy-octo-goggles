@@ -60,14 +60,22 @@ func (u *User) Chan(in *<-chan chatbox.Event, out *chan<- chatbox.Event) {
 }
 
 func (u *User) SendMessage(m string) {
-	*u.out <- chatbox.Event{Sender: u.uuid, Name: chatbox.SendMessage, Data: m}
+	e, err := chatbox.NewEvent(chatbox.SendMessage, m, u.uuid)
+	if err != nil {
+		panic(err)
+	}
+	*u.out <- e
 }
 
 func (u *User) handleEvent(e chatbox.Event) error {
 	switch e.Name {
 
 	case chatbox.RequestInitialUserState:
-		*u.out <- chatbox.Event{Sender: u.uuid, Name: chatbox.InitialUserState, Data: u.initialState}
+		e, err := chatbox.NewEvent(chatbox.InitialUserState, u.initialState, u.uuid)
+		if err != nil {
+			return err
+		}
+		*u.out <- e
 
 	case chatbox.RoomStateUpdate:
 		data, err := chatbox.GetData[chatbox.RoomState](e)
@@ -76,12 +84,27 @@ func (u *User) handleEvent(e chatbox.Event) error {
 		}
 		u.room = data
 
+	case chatbox.NewUser:
+		data, err := chatbox.GetData[chatbox.UserRef](e)
+		if err != nil {
+			return err
+		}
+		name := data.State.Name
+		if data.Uuid == u.uuid {
+			name = "you"
+		}
+		fmt.Printf(
+			"[%s] << %s entered the room >>\n",
+			time.Now().Local(),
+			name,
+		)
+
 	case chatbox.NewMessage:
 		data, err := chatbox.GetData[chatbox.Message](e)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("[%s %s] %s", time.Now().Local(), data.SenderName, data.Message)
+		fmt.Printf("[%s %s] %s\n", time.Now().Local(), data.SenderName, data.Message)
 
 	default:
 		return chatbox.UhandledEventError{Event: e, Receiver: u.uuid}

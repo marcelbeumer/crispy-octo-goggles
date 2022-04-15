@@ -45,6 +45,12 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 			return err
 		}
 		r.state.Users[uuid] = data
+		m := chatbox.UserRef{Uuid: uuid, State: data}
+		ne, err := chatbox.NewEvent(chatbox.NewUser, m, r.uuid)
+		if err != nil {
+			return err
+		}
+		r.emitEvents(ne)
 
 	case chatbox.SendMessage:
 		uuid, data, err := unpackUserEvent[string](*r, e)
@@ -54,8 +60,15 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 		name := r.state.Users[uuid].Name
 		msg := chatbox.Message{Sender: e.Sender, SenderName: name, Message: data}
 		r.state.Messages = append(r.state.Messages, msg)
-		r.emitEvent(chatbox.Event{Sender: r.uuid, Name: chatbox.RoomStateUpdate, Data: r.state})
-		r.emitEvent(chatbox.Event{Sender: r.uuid, Name: chatbox.NewMessage, Data: msg})
+		n1, err := chatbox.NewEvent(chatbox.RoomStateUpdate, r.state, r.uuid)
+		if err != nil {
+			return err
+		}
+		n2, err := chatbox.NewEvent(chatbox.NewMessage, msg, r.uuid)
+		if err != nil {
+			return err
+		}
+		r.emitEvents(n1, n2)
 
 	default:
 		return chatbox.UhandledEventError{Event: e, Receiver: r.uuid}
@@ -103,11 +116,12 @@ func (r *Room) AddUser(p chatbox.User) error {
 	return nil
 }
 
-func (r *Room) emitEvent(e chatbox.Event) {
-	for _, ch := range r.userCh {
-		ch <- e
+func (r *Room) emitEvents(events ...chatbox.Event) {
+	for _, e := range events {
+		for _, ch := range r.userCh {
+			ch <- e
+		}
 	}
-
 }
 
 func NewRoom() *Room {

@@ -8,13 +8,13 @@ import (
 type Room interface{}
 
 type Message struct {
-	Sender string
+	Sender     string
 	SenderName string
-	Message string
+	Message    string
 }
 
 type RoomState struct {
-	Users map[string]UserState
+	Users    map[string]UserState
 	Messages []Message
 }
 
@@ -24,14 +24,58 @@ type Event struct {
 	Data   any
 }
 
+type EventFn func() (Event, error)
+
+func NewEvent[T any](name EventName, data T, sender string) (Event, error) {
+	e := Event{Sender: sender, Name: name, Data: data}
+	switch name {
+
+	case RequestInitialUserState:
+		if _, err := GetData[UserState](e); err != nil {
+			return e, err
+		}
+
+	case InitialUserState:
+		if _, err := GetData[UserState](e); err != nil {
+			return e, err
+		}
+
+	case RoomStateUpdate:
+		if _, err := GetData[RoomState](e); err != nil {
+			return e, err
+		}
+
+	case NewUser:
+		if _, err := GetData[UserRef](e); err != nil {
+			return e, err
+		}
+
+	case SendMessage:
+		if _, err := GetData[string](e); err != nil {
+			return e, err
+		}
+
+	case NewMessage:
+		if _, err := GetData[Message](e); err != nil {
+			return e, err
+		}
+
+	default:
+		return e, UnknownEventError{Event: e}
+	}
+
+	return e, nil
+}
+
 type EventName string
 
 const (
 	RequestInitialUserState = "RequestInitialUserState"
 	InitialUserState        = "InitialUserState"
 	RoomStateUpdate         = "RoomStateUpdate"
-	SendMessage				= "SendMessage"
-	NewMessage				= "NewMessage"
+	NewUser                 = "NewUser"
+	SendMessage             = "SendMessage"
+	NewMessage              = "NewMessage"
 )
 
 type Status int
@@ -45,6 +89,11 @@ const (
 type UserState struct {
 	Name   string
 	Status Status
+}
+
+type UserRef struct {
+	Uuid  string
+	State UserState
 }
 
 type User interface {
@@ -72,9 +121,20 @@ func NewEventError(event Event, message string) EventError {
 	}
 }
 
+type UnknownEventError struct {
+	Event Event
+}
+
+func (e UnknownEventError) Error() string {
+	return fmt.Sprintf(
+		"unknown event \"%s\"",
+		e.Event.Name,
+	)
+}
+
 type UhandledEventError struct {
 	Receiver string
-	Event   Event
+	Event    Event
 }
 
 func (e UhandledEventError) Error() string {
@@ -115,4 +175,3 @@ func GetData[T any](e Event) (T, error) {
 		return data, NewDataTypeError(e, new(T))
 	}
 }
-
