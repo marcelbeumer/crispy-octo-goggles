@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/room"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
@@ -10,14 +12,14 @@ func main() {
 	r := room.NewRoom()
 	r.Start()
 
-	p := user.NewUser(chatbox.UserState{Name: "Example user", Status: chatbox.StatusBusy})
-	p.Start()
+	u := user.NewUser(chatbox.UserState{Name: "Example user", Status: chatbox.StatusBusy})
+	u.Start()
 
-	r.AddUser(p)
+	r.AddUser(u)
 
-	// go func() {
-	// 	time.Sleep(time.Second)
-	// 	fmt.Println("xx")
-	// }()
+	go func() {
+		time.Sleep(time.Second)
+		u.SendMessage("Hello!")
+	}()
 	r.WaitDone()
 }

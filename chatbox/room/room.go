@@ -38,16 +38,27 @@ func (r *Room) Start() error {
 
 func (r *Room) handleEvent(e chatbox.Event) error {
 	switch e.Name {
+
 	case chatbox.InitialUserState:
-		uuid := e.Sender
-		if found := r.HasUser(uuid); !found {
-			return chatbox.NewEventError(e, fmt.Sprintf("user %s not found", uuid))
-		}
-		data, err := chatbox.GetData[chatbox.UserState](e)
+		uuid, data, err := unpackUserEvent[chatbox.UserState](*r, e)
 		if err != nil {
 			return err
 		}
 		r.state.Users[uuid] = data
+
+	case chatbox.SendMessage:
+		uuid, data, err := unpackUserEvent[string](*r, e)
+		if err != nil {
+			return err
+		}
+		name := r.state.Users[uuid].Name
+		msg := chatbox.Message{Sender: e.Sender, SenderName: name, Message: data}
+		r.state.Messages = append(r.state.Messages, msg)
+		r.emitEvent(chatbox.Event{Sender: r.uuid, Name: chatbox.RoomStateUpdate, Data: r.state})
+		r.emitEvent(chatbox.Event{Sender: r.uuid, Name: chatbox.NewMessage, Data: msg})
+
+	default:
+		return chatbox.UhandledEventError{Event: e, Receiver: r.uuid}
 	}
 	return nil
 }
@@ -92,20 +103,34 @@ func (r *Room) AddUser(p chatbox.User) error {
 	return nil
 }
 
-func (r *Room) castState() {
-	msg := chatbox.Event{Sender: r.uuid, Data: r.state}
+func (r *Room) emitEvent(e chatbox.Event) {
 	for _, ch := range r.userCh {
-		ch <- msg
+		ch <- e
 	}
+
 }
 
 func NewRoom() *Room {
 	return &Room{
 		ch: make(chan chatbox.Event),
 		state: chatbox.RoomState{
-			Users: make(map[string]chatbox.UserState),
+			Users:    make(map[string]chatbox.UserState),
+			Messages: make([]chatbox.Message, 0),
 		},
 		userCh: make(map[string]chan chatbox.Event),
-		uuid:   uuid.NewString(),
+		uuid:   "room:" + uuid.NewString(),
 	}
+}
+
+func unpackUserEvent[T any](r Room, e chatbox.Event) (string, T, error) {
+	uuid := e.Sender
+	data, err := chatbox.GetData[T](e)
+	if err != nil {
+		return uuid, data, err
+	}
+	if found := r.HasUser(uuid); !found {
+		err := chatbox.NewEventError(e, fmt.Sprintf("user %s not found", uuid))
+		return uuid, data, err
+	}
+	return uuid, data, nil
 }

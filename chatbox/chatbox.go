@@ -7,8 +7,15 @@ import (
 
 type Room interface{}
 
+type Message struct {
+	Sender string
+	SenderName string
+	Message string
+}
+
 type RoomState struct {
 	Users map[string]UserState
+	Messages []Message
 }
 
 type Event struct {
@@ -23,6 +30,8 @@ const (
 	RequestInitialUserState = "RequestInitialUserState"
 	InitialUserState        = "InitialUserState"
 	RoomStateUpdate         = "RoomStateUpdate"
+	SendMessage				= "SendMessage"
+	NewMessage				= "NewMessage"
 )
 
 type Status int
@@ -44,45 +53,58 @@ type User interface {
 }
 
 type EventError struct {
-	event   Event
-	message string
+	Event   Event
+	Message string
 }
 
 func (e EventError) Error() string {
 	return fmt.Sprintf(
-		"error for event '%s': %s",
-		e.event.Name,
-		e.message,
+		"error for event \"%s\": %s",
+		e.Event.Name,
+		e.Message,
 	)
 }
 
 func NewEventError(event Event, message string) EventError {
 	return EventError{
-		event:   event,
-		message: message,
+		Event:   event,
+		Message: message,
 	}
 }
 
+type UhandledEventError struct {
+	Receiver string
+	Event   Event
+}
+
+func (e UhandledEventError) Error() string {
+	return fmt.Sprintf(
+		"%s could not handle event \"%s\"",
+		e.Receiver,
+		e.Event.Name,
+	)
+}
+
 type DataTypeError struct {
-	name     EventName
-	expected reflect.Type
-	actual   reflect.Type
+	Name     EventName
+	Expected reflect.Type
+	Actual   reflect.Type
 }
 
 func (e DataTypeError) Error() string {
 	return fmt.Sprintf(
 		"'%s' has wrong data type: expected %s but got %s",
-		e.name,
-		e.expected,
-		e.actual,
+		e.Name,
+		e.Expected,
+		e.Actual,
 	)
 }
 
 func NewDataTypeError(event Event, expected any) DataTypeError {
 	return DataTypeError{
-		name:     event.Name,
-		expected: reflect.TypeOf(expected),
-		actual:   reflect.TypeOf(event.Data),
+		Name:     event.Name,
+		Expected: reflect.TypeOf(expected),
+		Actual:   reflect.TypeOf(event.Data),
 	}
 }
 

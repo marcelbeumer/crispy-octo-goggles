@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
@@ -58,6 +59,10 @@ func (u *User) Chan(in *<-chan chatbox.Event, out *chan<- chatbox.Event) {
 	u.out = out
 }
 
+func (u *User) SendMessage(m string) {
+	*u.out <- chatbox.Event{Sender: u.uuid, Name: chatbox.SendMessage, Data: m}
+}
+
 func (u *User) handleEvent(e chatbox.Event) error {
 	switch e.Name {
 
@@ -70,6 +75,16 @@ func (u *User) handleEvent(e chatbox.Event) error {
 			return err
 		}
 		u.room = data
+
+	case chatbox.NewMessage:
+		data, err := chatbox.GetData[chatbox.Message](e)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("[%s %s] %s", time.Now().Local(), data.SenderName, data.Message)
+
+	default:
+		return chatbox.UhandledEventError{Event: e, Receiver: u.uuid}
 	}
 
 	return nil
@@ -78,6 +93,6 @@ func (u *User) handleEvent(e chatbox.Event) error {
 func NewUser(initialState chatbox.UserState) *User {
 	return &User{
 		initialState: initialState,
-		uuid:         uuid.NewString(),
+		uuid:         "user:" + uuid.NewString(),
 	}
 }
