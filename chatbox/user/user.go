@@ -9,13 +9,13 @@ import (
 )
 
 type User struct {
-	uuid         string
-	initialState chatbox.UserState
-	in           <-chan chatbox.Event
-	out          chan<- chatbox.Event
-	doneCh       chan struct{}
-	room         chatbox.RoomState
-	CanPrint     bool
+	name     string
+	uuid     string
+	in       <-chan chatbox.Event
+	out      chan<- chatbox.Event
+	doneCh   chan struct{}
+	room     chatbox.RoomState
+	CanPrint bool
 }
 
 func (u *User) Start() {
@@ -54,6 +54,10 @@ func (u *User) Uuid() string {
 	return u.uuid
 }
 
+func (u *User) Name() string {
+	return u.name
+}
+
 func (u *User) Chan(in <-chan chatbox.Event, out chan<- chatbox.Event) {
 	u.in = in
 	u.out = out
@@ -71,7 +75,10 @@ func (u *User) handleEvent(e chatbox.Event) error {
 	switch e.Name {
 
 	case chatbox.RequestInitialUserState:
-		e, err := chatbox.NewEvent(chatbox.InitialUserState, u.initialState, u.uuid)
+		e, err := chatbox.NewEvent(chatbox.InitialUserState, chatbox.UserState{
+			Name:   u.name,
+			Status: chatbox.StatusOnline,
+		}, u.uuid)
 		if err != nil {
 			return err
 		}
@@ -126,9 +133,9 @@ func (u *User) printf(format string, a ...any) {
 	}
 }
 
-func NewUser(initialState chatbox.UserState) *User {
+func NewUser(name string) *User {
 	return &User{
-		initialState: initialState,
-		uuid:         "user:" + uuid.NewString(),
+		name: name,
+		uuid: "user:" + uuid.NewString(),
 	}
 }

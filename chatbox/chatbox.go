@@ -81,7 +81,7 @@ const (
 type Status int
 
 const (
-	StatusOffline = iota + 1
+	StatusOffline = iota
 	StatusOnline
 	StatusBusy
 )

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/room"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
 )
@@ -14,16 +13,19 @@ func main() {
 	room.Start()
 
 	go func() {
-		admin := user.NewUser(chatbox.UserState{Name: "Admin", Status: chatbox.StatusBusy})
+		admin := user.NewUser("Admin")
 		admin.CanPrint = true
 		admin.Start()
+
+		john := user.NewUser("John")
+		john.Start()
+
+		kyle := user.NewUser("Kyle")
+		kyle.Start()
 
 		if err := room.AddUser(admin); err != nil {
 			panic(err)
 		}
-
-		john := user.NewUser(chatbox.UserState{Name: "John", Status: chatbox.StatusOnline})
-		john.Start()
 		if err := room.AddUser(john); err != nil {
 			panic(err)
 		}
@@ -32,8 +34,6 @@ func main() {
 		john.SendMessage("Hello empty room!")
 		time.Sleep(time.Second)
 
-		kyle := user.NewUser(chatbox.UserState{Name: "Kyle", Status: chatbox.StatusOnline})
-		kyle.Start()
 		if err := room.AddUser(kyle); err != nil {
 			panic(err)
 		}
