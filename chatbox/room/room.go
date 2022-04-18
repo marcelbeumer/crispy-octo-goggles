@@ -11,31 +11,44 @@ import (
 
 type Room struct {
 	uuid   string
-	ch     chan chatbox.Event
-	done   chan struct{}
+	outCh  chan chatbox.Event
 	userCh map[string]chan chatbox.Event
+	doneCh chan struct{}
 	state  chatbox.RoomState
 	l      *sync.RWMutex
 }
 
-func (r *Room) Start() error {
-	if r.done != nil {
-		return errors.New("already started")
+func (r *Room) Start() {
+	if r.doneCh != nil {
+		return
 	}
-	r.done = make(chan struct{})
+	r.doneCh = make(chan struct{})
 	go (func() {
 		for {
 			select {
-			case e := <-r.ch:
+			case e := <-r.outCh:
 				if err := r.handleEvent(e); err != nil {
-					fmt.Println(err)
+					fmt.Println("Error handling event", err)
 				}
-			case <-r.done:
+			case <-r.doneCh:
+				r.doneCh = nil
 				break
 			}
 		}
+
 	})()
-	return nil
+}
+
+func (r *Room) Stop() {
+	if r.doneCh != nil {
+		close(r.doneCh)
+	}
+}
+
+func (r *Room) Wait() {
+	if r.doneCh != nil {
+		<-r.doneCh
+	}
 }
 
 func (r *Room) handleEvent(e chatbox.Event) error {
@@ -56,7 +69,7 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
-		r.emitEvents(ne)
+		r.sendEventToAll(ne)
 
 	case chatbox.SendMessage:
 		uuid, data, err := unpackUserEvent[string](*r, e)
@@ -78,24 +91,12 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
-		r.emitEvents(n1, n2)
+		r.sendEventToAll(n1, n2)
 
 	default:
 		return chatbox.UhandledEventError{Event: e, Receiver: r.uuid}
 	}
 	return nil
-}
-
-func (r *Room) Stop() error {
-	if r.done == nil {
-		return errors.New("not started")
-	}
-	close(r.done)
-	return nil
-}
-
-func (r *Room) WaitDone() {
-	_ = <-r.done
 }
 
 func (r *Room) HasUser(uuid string) bool {
@@ -112,33 +113,40 @@ func (r *Room) AddUser(p chatbox.User) error {
 		return errors.New("user already added")
 	}
 
-	r.l.Lock()
 	uuid := p.Uuid()
-	r.state.Users[uuid] = chatbox.UserState{}
 	userCh := make(chan chatbox.Event)
+
+	r.l.Lock()
+	r.state.Users[uuid] = chatbox.UserState{}
 	r.userCh[uuid] = userCh
 	r.l.Unlock()
 
 	in := (<-chan chatbox.Event)(userCh)
-	out := (chan<- chatbox.Event)(r.ch)
-
+	out := (chan<- chatbox.Event)(r.outCh)
 	p.Chan(in, out)
-	userCh <- chatbox.Event{Sender: r.uuid, Name: chatbox.RequestInitialUserState}
+
+	r.sendEvent(userCh, chatbox.Event{Sender: r.uuid, Name: chatbox.RequestInitialUserState})
 
 	return nil
 }
 
-func (r *Room) emitEvents(events ...chatbox.Event) {
+func (r *Room) sendEventToAll(events ...chatbox.Event) {
 	for _, e := range events {
 		for _, ch := range r.userCh {
-			ch <- e
+			r.sendEvent(ch, e)
 		}
 	}
 }
 
+func (r *Room) sendEvent(ch chan chatbox.Event, e chatbox.Event) {
+	go (func() {
+		ch <- e
+	})()
+}
+
 func NewRoom() *Room {
 	return &Room{
-		ch: make(chan chatbox.Event),
+		outCh: make(chan chatbox.Event),
 		state: chatbox.RoomState{
 			Users:    make(map[string]chatbox.UserState),
 			Messages: make([]chatbox.Message, 0),

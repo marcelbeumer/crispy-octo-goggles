@@ -16,31 +16,24 @@ func main() {
 	go func() {
 		admin := user.NewUser(chatbox.UserState{Name: "Admin", Status: chatbox.StatusBusy})
 		admin.CanPrint = true
-		if err := admin.Start(); err != nil {
-			panic(err)
-		}
+		admin.Start()
+
 		if err := room.AddUser(admin); err != nil {
 			panic(err)
 		}
 
 		john := user.NewUser(chatbox.UserState{Name: "John", Status: chatbox.StatusOnline})
-		if err := john.Start(); err != nil {
-			panic(err)
-		}
+		john.Start()
 		if err := room.AddUser(john); err != nil {
 			panic(err)
 		}
 
 		time.Sleep(time.Second)
-
 		john.SendMessage("Hello empty room!")
-
 		time.Sleep(time.Second)
 
 		kyle := user.NewUser(chatbox.UserState{Name: "Kyle", Status: chatbox.StatusOnline})
-		if err := kyle.Start(); err != nil {
-			panic(err)
-		}
+		kyle.Start()
 		if err := room.AddUser(kyle); err != nil {
 			panic(err)
 		}
@@ -56,11 +49,8 @@ func main() {
 			time.Sleep(time.Second)
 		}
 
-		// admin.WaitDone()
-		// kyle.WaitDone()
-		// john.WaitDone()
 		room.Stop()
 	}()
 
-	room.WaitDone()
+	room.Wait()
 }

@@ -1,7 +1,6 @@
 package user
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,42 +13,41 @@ type User struct {
 	initialState chatbox.UserState
 	in           <-chan chatbox.Event
 	out          chan<- chatbox.Event
-	done         chan struct{}
+	doneCh       chan struct{}
 	room         chatbox.RoomState
 	CanPrint     bool
 }
 
-func (u *User) Start() error {
-	if u.done != nil {
-		return errors.New("already started")
+func (u *User) Start() {
+	if u.doneCh != nil {
+		return
 	}
-	u.done = make(chan struct{})
+	u.doneCh = make(chan struct{})
 	go (func() {
-		in := u.in
 		for {
 			select {
-			case e := <-in:
+			case e := <-u.in:
 				if err := u.handleEvent(e); err != nil {
 					fmt.Println(err)
 				}
-			case <-u.done:
+			case <-u.doneCh:
+				u.doneCh = nil
 				break
 			}
 		}
 	})()
-	return nil
 }
 
-func (u *User) Stop() error {
-	if u.done == nil {
-		return errors.New("not started")
+func (u *User) Stop() {
+	if u.doneCh != nil {
+		close(u.doneCh)
 	}
-	close(u.done)
-	return nil
 }
 
-func (u *User) WaitDone() {
-	_ = <-u.done
+func (u *User) Wait() {
+	if u.doneCh != nil {
+		<-u.doneCh
+	}
 }
 
 func (u *User) Uuid() string {
@@ -66,7 +64,7 @@ func (u *User) SendMessage(m string) {
 	if err != nil {
 		panic(err)
 	}
-	u.out <- e
+	go u.sendEvent(e)
 }
 
 func (u *User) handleEvent(e chatbox.Event) error {
@@ -77,7 +75,7 @@ func (u *User) handleEvent(e chatbox.Event) error {
 		if err != nil {
 			return err
 		}
-		u.out <- e
+		go u.sendEvent(e)
 
 	case chatbox.RoomStateUpdate:
 		data, err := chatbox.GetData[chatbox.RoomState](e)
@@ -113,6 +111,12 @@ func (u *User) handleEvent(e chatbox.Event) error {
 	}
 
 	return nil
+}
+
+func (u *User) sendEvent(e chatbox.Event) {
+	go (func() {
+		u.out <- e
+	})()
 }
 
 func (u *User) printf(format string, a ...any) {
