@@ -5,6 +5,15 @@ import (
 	"reflect"
 )
 
+type Room interface {
+	Connect(uuid string) (in <-chan Event, out chan<- Event, err error)
+}
+
+type User interface {
+	Uuid() string
+	Connect(in <-chan Event, out chan<- Event) error
+}
+
 type Message struct {
 	Sender     string
 	SenderName string
@@ -161,4 +170,15 @@ func GetData[T any](e Event) (T, error) {
 	} else {
 		return data, NewDataTypeError(e, new(T))
 	}
+}
+
+func ConnectUser(r Room, u User) error {
+	in, out, err := r.Connect(u.Uuid())
+	if err != nil {
+		return err
+	}
+	if err := u.Connect(in, out); err != nil {
+		return err
+	}
+	return nil
 }
