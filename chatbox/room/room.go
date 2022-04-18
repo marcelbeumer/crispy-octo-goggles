@@ -141,7 +141,7 @@ func (r *Room) sendEvent(ch chan chatbox.Event, e chatbox.Event) {
 }
 
 func NewRoom() *Room {
-	return &Room{
+	r := &Room{
 		outCh: make(chan chatbox.Event),
 		state: chatbox.RoomState{
 			Users:    make(map[string]chatbox.UserState),
@@ -151,6 +151,8 @@ func NewRoom() *Room {
 		uuid:   "room:" + uuid.NewString(),
 		l:      &sync.RWMutex{},
 	}
+	r.Start()
+	return r
 }
 
 func unpackUserEvent[T any](r Room, e chatbox.Event) (string, T, error) {

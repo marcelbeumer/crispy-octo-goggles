@@ -11,7 +11,6 @@ import (
 
 func main() {
 	room := room.NewRoom()
-	room.Start()
 
 	go func() {
 		admin := user.NewUser("Admin", true)
