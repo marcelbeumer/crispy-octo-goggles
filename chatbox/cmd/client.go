@@ -22,6 +22,7 @@ var clientCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		addr := fmt.Sprintf("%s:%d", remoteHost, remotePort)
 		fmt.Printf("Connecting to %s\n", addr)
-		_ = client.NewClient()
+		c := client.NewClient()
+		<- c.Start()
 	},
 }
