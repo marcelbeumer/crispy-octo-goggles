@@ -8,8 +8,8 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "app2",
-	Short: "Project-S app (golang)",
+	Use:   "chatbox",
+	Short: "Chatbox",
 }
 
 func Execute() {

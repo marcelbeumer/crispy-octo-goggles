@@ -11,58 +11,51 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
 )
 
-var serverHost string
-var serverPort int
-
 func init() {
-	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(testCmd)
 }
 
-var runCmd = &cobra.Command{
+var testCmd = &cobra.Command{
 	Use:   "test",
 	Short: "Run test scenario",
 	Run: func(cmd *cobra.Command, args []string) {
-		test()
-	},
-}
+		room := room.NewRoom()
 
-func test() {
-	room := room.NewRoom()
+		go func() {
+			admin := user.NewUser("Admin", true)
+			if err := channel.ConnectUser(room, admin); err != nil {
+				panic(err)
+			}
 
-	go func() {
-		admin := user.NewUser("Admin", true)
-		if err := channel.ConnectUser(room, admin); err != nil {
-			panic(err)
-		}
+			john := user.NewUser("John", false)
+			if err := channel.ConnectUser(room, john); err != nil {
+				panic(err)
+			}
 
-		john := user.NewUser("John", false)
-		if err := channel.ConnectUser(room, john); err != nil {
-			panic(err)
-		}
+			kyle := user.NewUser("Kyle", false)
 
-		kyle := user.NewUser("Kyle", false)
-
-		time.Sleep(time.Second)
-		john.SendMessage("Hello empty room!")
-		time.Sleep(time.Second)
-
-		if err := channel.ConnectUser(room, kyle); err != nil {
-			panic(err)
-		}
-
-		time.Sleep(time.Second)
-
-		kyle.SendMessage("Hello John")
-		john.SendMessage("Hi Kyle")
-
-		for x := 3; x > 0; x-- {
-			msg := fmt.Sprintf("Room will self destruct in %d...", x)
-			admin.SendMessage(msg)
 			time.Sleep(time.Second)
-		}
+			john.SendMessage("Hello empty room!")
+			time.Sleep(time.Second)
 
-		room.Stop()
-	}()
+			if err := channel.ConnectUser(room, kyle); err != nil {
+				panic(err)
+			}
 
-	room.Wait()
+			time.Sleep(time.Second)
+
+			kyle.SendMessage("Hello John")
+			john.SendMessage("Hi Kyle")
+
+			for x := 3; x > 0; x-- {
+				msg := fmt.Sprintf("Room will self destruct in %d...", x)
+				admin.SendMessage(msg)
+				time.Sleep(time.Second)
+			}
+
+			room.Stop()
+		}()
+
+		room.Wait()
+	},
 }
