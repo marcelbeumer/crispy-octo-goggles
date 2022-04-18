@@ -1,6 +1,8 @@
-package main
+package cmd
 
 import (
+	"github.com/spf13/cobra"
+
 	"fmt"
 	"time"
 
@@ -9,7 +11,22 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
 )
 
-func main() {
+var serverHost string
+var serverPort int
+
+func init() {
+	rootCmd.AddCommand(runCmd)
+}
+
+var runCmd = &cobra.Command{
+	Use:   "test",
+	Short: "Run test scenario",
+	Run: func(cmd *cobra.Command, args []string) {
+		test()
+	},
+}
+
+func test() {
 	room := room.NewRoom()
 
 	go func() {

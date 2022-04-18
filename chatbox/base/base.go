@@ -1,4 +1,4 @@
-package chatbox
+package base
 
 import (
 	"fmt"
