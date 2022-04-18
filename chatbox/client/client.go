@@ -4,9 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/base"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
 )
 
 type Client struct {
+	user   *user.User
+	inCh   chan base.Event
+	outCh  chan base.Event
 	doneCh chan struct{}
 }
 
@@ -58,6 +64,8 @@ func (s *Client) Start() chan struct{} {
 }
 
 func NewClient() *Client {
-	s := Client{}
+	name := "my name"
+	u := user.NewUser(name, true)
+	s := Client{user: u}
 	return &s
 }
