@@ -5,8 +5,6 @@ import (
 	"reflect"
 )
 
-type Room interface{}
-
 type Message struct {
 	Sender     string
 	SenderName string
@@ -30,12 +28,7 @@ func NewEvent[T any](name EventName, data T, sender string) (Event, error) {
 	e := Event{Sender: sender, Name: name, Data: data}
 	switch name {
 
-	case RequestInitialUserState:
-		if _, err := GetData[UserState](e); err != nil {
-			return e, err
-		}
-
-	case InitialUserState:
+	case Connect:
 		if _, err := GetData[UserState](e); err != nil {
 			return e, err
 		}
@@ -70,12 +63,11 @@ func NewEvent[T any](name EventName, data T, sender string) (Event, error) {
 type EventName string
 
 const (
-	RequestInitialUserState = "RequestInitialUserState"
-	InitialUserState        = "InitialUserState"
-	RoomStateUpdate         = "RoomStateUpdate"
-	NewUser                 = "NewUser"
-	SendMessage             = "SendMessage"
-	NewMessage              = "NewMessage"
+	Connect         = "Connect"
+	RoomStateUpdate = "RoomStateUpdate"
+	NewUser         = "NewUser"
+	SendMessage     = "SendMessage"
+	NewMessage      = "NewMessage"
 )
 
 type Status int
@@ -94,11 +86,6 @@ type UserState struct {
 type UserRef struct {
 	Uuid  string
 	State UserState
-}
-
-type User interface {
-	Uuid() string
-	Chan(in <-chan Event, out chan<- Event)
 }
 
 type EventError struct {

@@ -54,7 +54,7 @@ func (r *Room) Wait() {
 func (r *Room) handleEvent(e chatbox.Event) error {
 	switch e.Name {
 
-	case chatbox.InitialUserState:
+	case chatbox.Connect:
 		uuid, data, err := unpackUserEvent[chatbox.UserState](*r, e)
 		if err != nil {
 			return err
@@ -99,7 +99,7 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 	return nil
 }
 
-func (r *Room) HasUser(uuid string) bool {
+func (r *Room) HasUuid(uuid string) bool {
 	for key := range r.userCh {
 		if key == uuid {
 			return true
@@ -108,12 +108,11 @@ func (r *Room) HasUser(uuid string) bool {
 	return false
 }
 
-func (r *Room) AddUser(p chatbox.User) error {
-	if found := r.HasUser(p.Uuid()); found {
-		return errors.New("user already added")
+func (r *Room) Connect(uuid string) (in <-chan chatbox.Event, out chan<- chatbox.Event, err error) {
+	if found := r.HasUuid(uuid); found {
+		return nil, nil, errors.New("uuid already added")
 	}
 
-	uuid := p.Uuid()
 	userCh := make(chan chatbox.Event)
 
 	r.l.Lock()
@@ -121,13 +120,10 @@ func (r *Room) AddUser(p chatbox.User) error {
 	r.userCh[uuid] = userCh
 	r.l.Unlock()
 
-	in := (<-chan chatbox.Event)(userCh)
-	out := (chan<- chatbox.Event)(r.outCh)
-	p.Chan(in, out)
+	in = (<-chan chatbox.Event)(userCh)
+	out = (chan<- chatbox.Event)(r.outCh)
 
-	r.sendEvent(userCh, chatbox.Event{Sender: r.uuid, Name: chatbox.RequestInitialUserState})
-
-	return nil
+	return in, out, nil
 }
 
 func (r *Room) sendEventToAll(events ...chatbox.Event) {
@@ -163,7 +159,7 @@ func unpackUserEvent[T any](r Room, e chatbox.Event) (string, T, error) {
 	if err != nil {
 		return uuid, data, err
 	}
-	if found := r.HasUser(uuid); !found {
+	if found := r.HasUuid(uuid); !found {
 		err := chatbox.NewEventError(e, fmt.Sprintf("user %s not found", uuid))
 		return uuid, data, err
 	}

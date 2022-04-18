@@ -58,9 +58,18 @@ func (u *User) Name() string {
 	return u.name
 }
 
-func (u *User) Chan(in <-chan chatbox.Event, out chan<- chatbox.Event) {
+func (u *User) Connect(in <-chan chatbox.Event, out chan<- chatbox.Event) error {
 	u.in = in
 	u.out = out
+	e, err := chatbox.NewEvent(chatbox.Connect, chatbox.UserState{
+		Name:   u.name,
+		Status: chatbox.StatusOnline,
+	}, u.uuid)
+	if err != nil {
+		return err
+	}
+	u.sendEvent(e)
+	return nil
 }
 
 func (u *User) SendMessage(m string) {
@@ -73,16 +82,6 @@ func (u *User) SendMessage(m string) {
 
 func (u *User) handleEvent(e chatbox.Event) error {
 	switch e.Name {
-
-	case chatbox.RequestInitialUserState:
-		e, err := chatbox.NewEvent(chatbox.InitialUserState, chatbox.UserState{
-			Name:   u.name,
-			Status: chatbox.StatusOnline,
-		}, u.uuid)
-		if err != nil {
-			return err
-		}
-		go u.sendEvent(e)
 
 	case chatbox.RoomStateUpdate:
 		data, err := chatbox.GetData[chatbox.RoomState](e)
@@ -133,9 +132,12 @@ func (u *User) printf(format string, a ...any) {
 	}
 }
 
-func NewUser(name string) *User {
-	return &User{
-		name: name,
-		uuid: "user:" + uuid.NewString(),
+func NewUser(name string, canPrint bool) *User {
+	u := &User{
+		name:     name,
+		CanPrint: canPrint,
+		uuid:     "user:" + uuid.NewString(),
 	}
+	u.Start()
+	return u
 }
