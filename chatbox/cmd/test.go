@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channel"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connect"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/room"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
 )
@@ -14,6 +14,7 @@ import (
 func init() {
 	rootCmd.AddCommand(testCmd)
 }
+
 
 var testCmd = &cobra.Command{
 	Use:   "test",
@@ -23,12 +24,12 @@ var testCmd = &cobra.Command{
 
 		go func() {
 			admin := user.NewUser("Admin", true)
-			if err := channel.ConnectUser(room, admin); err != nil {
+			if err := connect.ConnectUser(room, admin); err != nil {
 				panic(err)
 			}
 
 			john := user.NewUser("John", false)
-			if err := channel.ConnectUser(room, john); err != nil {
+			if err := connect.ConnectUser(room, john); err != nil {
 				panic(err)
 			}
 
@@ -38,7 +39,7 @@ var testCmd = &cobra.Command{
 			john.SendMessage("Hello empty room!")
 			time.Sleep(time.Second)
 
-			if err := channel.ConnectUser(room, kyle); err != nil {
+			if err := connect.ConnectUser(room, kyle); err != nil {
 				panic(err)
 			}
 

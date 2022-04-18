@@ -7,12 +7,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/base"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/lib/channel"
 )
 
 type Room struct {
 	uuid   string
+	inCh   chan base.Event
 	outCh  chan base.Event
-	userCh map[string]chan base.Event
+	outChx (*channel.Multiplexer[base.Event])
+	userCh map[string](*<-chan base.Event)
 	doneCh chan struct{}
 	state  base.RoomState
 	l      *sync.RWMutex
@@ -26,7 +29,7 @@ func (r *Room) Start() {
 	go (func() {
 		for {
 			select {
-			case e := <-r.outCh:
+			case e := <-r.inCh:
 				if err := r.handleEvent(e); err != nil {
 					fmt.Println("Error handling event", err)
 				}
@@ -69,7 +72,7 @@ func (r *Room) handleEvent(e base.Event) error {
 		if err != nil {
 			return err
 		}
-		r.sendEventToAll(ne)
+		r.sendEvent(r.outCh, ne)
 
 	case base.SendMessage:
 		uuid, data, err := unpackUserEvent[string](*r, e)
@@ -91,7 +94,8 @@ func (r *Room) handleEvent(e base.Event) error {
 		if err != nil {
 			return err
 		}
-		r.sendEventToAll(n1, n2)
+		r.sendEvent(r.outCh, n1)
+		r.sendEvent(r.outCh, n2)
 
 	default:
 		return base.UhandledEventError{Event: e, Receiver: r.uuid}
@@ -113,25 +117,16 @@ func (r *Room) Connect(uuid string) (in <-chan base.Event, out chan<- base.Event
 		return nil, nil, errors.New("uuid already added")
 	}
 
-	userCh := make(chan base.Event)
-
+	userCh := r.outChx.Add()
 	r.l.Lock()
 	r.state.Users[uuid] = base.UserState{}
 	r.userCh[uuid] = userCh
 	r.l.Unlock()
 
-	in = (<-chan base.Event)(userCh)
-	out = (chan<- base.Event)(r.outCh)
+	in = *userCh
+	out = (chan<- base.Event)(r.inCh)
 
 	return in, out, nil
-}
-
-func (r *Room) sendEventToAll(events ...base.Event) {
-	for _, e := range events {
-		for _, ch := range r.userCh {
-			r.sendEvent(ch, e)
-		}
-	}
 }
 
 func (r *Room) sendEvent(ch chan base.Event, e base.Event) {
@@ -141,13 +136,17 @@ func (r *Room) sendEvent(ch chan base.Event, e base.Event) {
 }
 
 func NewRoom() *Room {
+	inCh := make(chan base.Event)
+	outCh := make(chan base.Event)
 	r := &Room{
-		outCh: make(chan base.Event),
+		inCh:   inCh,
+		outCh:  outCh,
+		outChx: channel.NewMultiplexer(outCh),
 		state: base.RoomState{
 			Users:    make(map[string]base.UserState),
 			Messages: make([]base.Message, 0),
 		},
-		userCh: make(map[string]chan base.Event),
+		userCh: make(map[string]*<-chan base.Event),
 		uuid:   "room:" + uuid.NewString(),
 		l:      &sync.RWMutex{},
 	}

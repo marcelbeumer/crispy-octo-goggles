@@ -1,4 +1,4 @@
-package channel
+package connect
 
 import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/room"
