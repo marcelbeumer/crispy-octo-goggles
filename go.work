@@ -1,5 +1,7 @@
 go 1.18
 
-use ./yamlparse
-
-use ./typeswitch
+use (
+	./chatbox
+	./typeswitch
+	./yamlparse
+)
