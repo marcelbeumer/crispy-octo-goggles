@@ -16,11 +16,11 @@ type Client struct {
 	doneCh chan struct{}
 }
 
-func (s *Client) Connect(serverAddr string) error {
-	// r := s.initRouting()
-	// err := http.ListenAndServe(addr, r)
-	return nil
-}
+// func (s *Client) Connect(serverAddr string) error {
+// 	// r := s.initRouting()
+// 	// err := http.ListenAndServe(addr, r)
+// 	return nil
+// }
 
 func (s *Client) Start() chan struct{} {
 	s.doneCh = make(chan struct{})
