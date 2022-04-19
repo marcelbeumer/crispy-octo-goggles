@@ -5,16 +5,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/base"
 )
 
 type User struct {
 	name     string
 	uuid     string
-	in       <-chan chatbox.Event
-	out      chan<- chatbox.Event
+	in       <-chan base.Event
+	out      chan<- base.Event
 	doneCh   chan struct{}
-	room     chatbox.RoomState
+	room     base.RoomState
 	CanPrint bool
 }
 
@@ -58,12 +58,12 @@ func (u *User) Name() string {
 	return u.name
 }
 
-func (u *User) Connect(in <-chan chatbox.Event, out chan<- chatbox.Event) error {
+func (u *User) Connect(in <-chan base.Event, out chan<- base.Event) error {
 	u.in = in
 	u.out = out
-	e, err := chatbox.NewEvent(chatbox.Connect, chatbox.UserState{
+	e, err := base.NewEvent(base.Connect, base.UserState{
 		Name:   u.name,
-		Status: chatbox.StatusOnline,
+		Status: base.StatusOnline,
 	}, u.uuid)
 	if err != nil {
 		return err
@@ -73,25 +73,25 @@ func (u *User) Connect(in <-chan chatbox.Event, out chan<- chatbox.Event) error 
 }
 
 func (u *User) SendMessage(m string) {
-	e, err := chatbox.NewEvent(chatbox.SendMessage, m, u.uuid)
+	e, err := base.NewEvent(base.SendMessage, m, u.uuid)
 	if err != nil {
 		panic(err)
 	}
 	go u.sendEvent(e)
 }
 
-func (u *User) handleEvent(e chatbox.Event) error {
+func (u *User) handleEvent(e base.Event) error {
 	switch e.Name {
 
-	case chatbox.RoomStateUpdate:
-		data, err := chatbox.GetData[chatbox.RoomState](e)
+	case base.RoomStateUpdate:
+		data, err := base.GetData[base.RoomState](e)
 		if err != nil {
 			return err
 		}
 		u.room = data
 
-	case chatbox.NewUser:
-		data, err := chatbox.GetData[chatbox.UserRef](e)
+	case base.NewUser:
+		data, err := base.GetData[base.UserRef](e)
 		if err != nil {
 			return err
 		}
@@ -105,21 +105,21 @@ func (u *User) handleEvent(e chatbox.Event) error {
 			name,
 		)
 
-	case chatbox.NewMessage:
-		data, err := chatbox.GetData[chatbox.Message](e)
+	case base.NewMessage:
+		data, err := base.GetData[base.Message](e)
 		if err != nil {
 			return err
 		}
 		u.printf("[%s %s] %s\n", time.Now().Local(), data.SenderName, data.Message)
 
 	default:
-		return chatbox.UhandledEventError{Event: e, Receiver: u.uuid}
+		return base.UhandledEventError{Event: e, Receiver: u.uuid}
 	}
 
 	return nil
 }
 
-func (u *User) sendEvent(e chatbox.Event) {
+func (u *User) sendEvent(e base.Event) {
 	go (func() {
 		u.out <- e
 	})()

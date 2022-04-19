@@ -6,15 +6,18 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/base"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/lib/channel"
 )
 
 type Room struct {
 	uuid   string
-	outCh  chan chatbox.Event
-	userCh map[string]chan chatbox.Event
+	inCh   chan base.Event
+	outCh  chan base.Event
+	outChx (*channel.Multiplexer[base.Event])
+	userCh map[string](*<-chan base.Event)
 	doneCh chan struct{}
-	state  chatbox.RoomState
+	state  base.RoomState
 	l      *sync.RWMutex
 }
 
@@ -26,7 +29,7 @@ func (r *Room) Start() {
 	go (func() {
 		for {
 			select {
-			case e := <-r.outCh:
+			case e := <-r.inCh:
 				if err := r.handleEvent(e); err != nil {
 					fmt.Println("Error handling event", err)
 				}
@@ -51,11 +54,11 @@ func (r *Room) Wait() {
 	}
 }
 
-func (r *Room) handleEvent(e chatbox.Event) error {
+func (r *Room) handleEvent(e base.Event) error {
 	switch e.Name {
 
-	case chatbox.Connect:
-		uuid, data, err := unpackUserEvent[chatbox.UserState](*r, e)
+	case base.Connect:
+		uuid, data, err := unpackUserEvent[base.UserState](*r, e)
 		if err != nil {
 			return err
 		}
@@ -64,14 +67,14 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 		r.state.Users[uuid] = data
 		r.l.Unlock()
 
-		m := chatbox.UserRef{Uuid: uuid, State: data}
-		ne, err := chatbox.NewEvent(chatbox.NewUser, m, r.uuid)
+		m := base.UserRef{Uuid: uuid, State: data}
+		ne, err := base.NewEvent(base.NewUser, m, r.uuid)
 		if err != nil {
 			return err
 		}
-		r.sendEventToAll(ne)
+		r.sendEvent(r.outCh, ne)
 
-	case chatbox.SendMessage:
+	case base.SendMessage:
 		uuid, data, err := unpackUserEvent[string](*r, e)
 		if err != nil {
 			return err
@@ -79,22 +82,23 @@ func (r *Room) handleEvent(e chatbox.Event) error {
 
 		r.l.Lock()
 		name := r.state.Users[uuid].Name
-		msg := chatbox.Message{Sender: e.Sender, SenderName: name, Message: data}
+		msg := base.Message{Sender: e.Sender, SenderName: name, Message: data}
 		r.state.Messages = append(r.state.Messages, msg)
 		r.l.Unlock()
 
-		n1, err := chatbox.NewEvent(chatbox.RoomStateUpdate, r.state, r.uuid)
+		n1, err := base.NewEvent(base.RoomStateUpdate, r.state, r.uuid)
 		if err != nil {
 			return err
 		}
-		n2, err := chatbox.NewEvent(chatbox.NewMessage, msg, r.uuid)
+		n2, err := base.NewEvent(base.NewMessage, msg, r.uuid)
 		if err != nil {
 			return err
 		}
-		r.sendEventToAll(n1, n2)
+		r.sendEvent(r.outCh, n1)
+		r.sendEvent(r.outCh, n2)
 
 	default:
-		return chatbox.UhandledEventError{Event: e, Receiver: r.uuid}
+		return base.UhandledEventError{Event: e, Receiver: r.uuid}
 	}
 	return nil
 }
@@ -108,46 +112,41 @@ func (r *Room) HasUuid(uuid string) bool {
 	return false
 }
 
-func (r *Room) Connect(uuid string) (in <-chan chatbox.Event, out chan<- chatbox.Event, err error) {
+func (r *Room) Connect(uuid string) (in <-chan base.Event, out chan<- base.Event, err error) {
 	if found := r.HasUuid(uuid); found {
 		return nil, nil, errors.New("uuid already added")
 	}
 
-	userCh := make(chan chatbox.Event)
-
+	userCh := r.outChx.Add()
 	r.l.Lock()
-	r.state.Users[uuid] = chatbox.UserState{}
+	r.state.Users[uuid] = base.UserState{}
 	r.userCh[uuid] = userCh
 	r.l.Unlock()
 
-	in = (<-chan chatbox.Event)(userCh)
-	out = (chan<- chatbox.Event)(r.outCh)
+	in = *userCh
+	out = (chan<- base.Event)(r.inCh)
 
 	return in, out, nil
 }
 
-func (r *Room) sendEventToAll(events ...chatbox.Event) {
-	for _, e := range events {
-		for _, ch := range r.userCh {
-			r.sendEvent(ch, e)
-		}
-	}
-}
-
-func (r *Room) sendEvent(ch chan chatbox.Event, e chatbox.Event) {
+func (r *Room) sendEvent(ch chan base.Event, e base.Event) {
 	go (func() {
 		ch <- e
 	})()
 }
 
 func NewRoom() *Room {
+	inCh := make(chan base.Event)
+	outCh := make(chan base.Event)
 	r := &Room{
-		outCh: make(chan chatbox.Event),
-		state: chatbox.RoomState{
-			Users:    make(map[string]chatbox.UserState),
-			Messages: make([]chatbox.Message, 0),
+		inCh:   inCh,
+		outCh:  outCh,
+		outChx: channel.NewMultiplexer(outCh),
+		state: base.RoomState{
+			Users:    make(map[string]base.UserState),
+			Messages: make([]base.Message, 0),
 		},
-		userCh: make(map[string]chan chatbox.Event),
+		userCh: make(map[string]*<-chan base.Event),
 		uuid:   "room:" + uuid.NewString(),
 		l:      &sync.RWMutex{},
 	}
@@ -155,14 +154,14 @@ func NewRoom() *Room {
 	return r
 }
 
-func unpackUserEvent[T any](r Room, e chatbox.Event) (string, T, error) {
+func unpackUserEvent[T any](r Room, e base.Event) (string, T, error) {
 	uuid := e.Sender
-	data, err := chatbox.GetData[T](e)
+	data, err := base.GetData[T](e)
 	if err != nil {
 		return uuid, data, err
 	}
 	if found := r.HasUuid(uuid); !found {
-		err := chatbox.NewEventError(e, fmt.Sprintf("user %s not found", uuid))
+		err := base.NewEventError(e, fmt.Sprintf("user %s not found", uuid))
 		return uuid, data, err
 	}
 	return uuid, data, nil
