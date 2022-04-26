@@ -23,9 +23,7 @@ var serverCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		addr := fmt.Sprintf("%s:%d", remoteHost, remotePort)
 		fmt.Printf("Starting server on %s\n", addr)
-		s := server.Server{}
-		defer s.Stop()
-		err := s.Start(addr)
+		err := server.StartServer(addr)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
