@@ -1,8 +1,9 @@
 go 1.18
 
 use (
-	./websockets
 	./chatbox
+	./typednil
 	./typeswitch
+	./websockets
 	./yamlparse
 )
