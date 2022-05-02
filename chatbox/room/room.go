@@ -130,7 +130,7 @@ func (r *Room) sendMessageToUser(name string, msg message.Message) error {
 			return
 			//
 		case <-time.After(time.Second * 2):
-			errChan <- fmt.Errorf("message to user <%s> timed out", name)
+			errChan <- fmt.Errorf("message to user \"%s\" timed out", name)
 			return
 			//
 		}
