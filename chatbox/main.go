@@ -1,9 +1,9 @@
 package main
 
-import (
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/cmd"
-)
+import "fmt"
 
 func main() {
-	cmd.Execute()
+	fmt.Println("new")
+
+	// cmd.Execute()
 }
