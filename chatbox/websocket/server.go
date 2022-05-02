@@ -1,14 +1,14 @@
-package server
+package websocket
 
 import (
 	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/gorilla/websocket"
+	ws "github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
+var upgrader = ws.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }

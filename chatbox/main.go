@@ -4,8 +4,7 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/client"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/server"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
 type ClientServerOpts struct {
@@ -34,12 +33,12 @@ func main() {
 	switch ctx.Command() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		if err := client.StartClient(addr); err != nil {
+		if err := websocket.StartClient(addr); err != nil {
 			panic(err)
 		}
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		if err := server.StartServer(addr); err != nil {
+		if err := websocket.StartServer(addr); err != nil {
 			panic(err)
 		}
 	case "test":

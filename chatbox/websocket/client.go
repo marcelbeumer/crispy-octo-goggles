@@ -1,4 +1,4 @@
-package client
+package websocket
 
 import (
 	"log"
@@ -7,12 +7,12 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/gorilla/websocket"
+	ws "github.com/gorilla/websocket"
 )
 
 func StartClient(serverAddr string) error {
 	u := url.URL{Scheme: "ws", Host: serverAddr, Path: "/"}
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	conn, _, err := ws.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func StartClient(serverAddr string) error {
 			return nil
 
 		case t := <-ticker.C:
-			err := conn.WriteMessage(websocket.TextMessage, []byte(t.String()))
+			err := conn.WriteMessage(ws.TextMessage, []byte(t.String()))
 			if err != nil {
 				log.Printf("Write error: %s", err)
 				return err
@@ -55,8 +55,8 @@ func StartClient(serverAddr string) error {
 			log.Println("Interrupt")
 
 			if err := conn.WriteMessage(
-				websocket.CloseMessage,
-				websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+				ws.CloseMessage,
+				ws.FormatCloseMessage(ws.CloseNormalClosure, ""),
 			); err != nil {
 				return err
 			}
