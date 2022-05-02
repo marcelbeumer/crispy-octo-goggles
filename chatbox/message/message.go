@@ -85,7 +85,7 @@ func getDataType[T any](v any) (T, error) {
 	return data, nil
 }
 
-func GetMessageData[T any](m Message) (T, error) {
+func GetData[T any](m Message) (T, error) {
 	empty := *new(T)
 	err := ValidateMessage(Message{Name: m.Name, Data: empty})
 	if err != nil {

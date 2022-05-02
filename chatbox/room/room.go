@@ -85,7 +85,7 @@ func (r *Room) DisconnectUser(name string) error {
 func (r *Room) handleUserMessage(name string, m message.Message) error {
 	switch m.Name {
 	case message.SEND_MESSAGE:
-		mData, err := message.GetMessageData[message.MessageData](m)
+		mData, err := message.GetData[message.MessageData](m)
 		if err != nil {
 			return err
 		}
@@ -110,9 +110,7 @@ func (r *Room) broadcastMessage(msg message.Message, exceptNames ...string) {
 	}
 	for _, user := range r.users {
 		if !except[user.name] {
-			if err := r.sendMessageToUser(user.name, msg); err != nil {
-				fmt.Println(err)
-			}
+			r.sendMessageToUser(user.name, msg)
 		}
 	}
 }
@@ -122,20 +120,18 @@ func (r *Room) sendMessageToUser(name string, msg message.Message) error {
 	if err != nil {
 		return err
 	}
-	errChan := make(chan error)
 	go (func() {
 		select {
 		case user.conn.ToOther <- msg:
-			errChan <- nil
 			return
 			//
 		case <-time.After(time.Second * 2):
-			errChan <- fmt.Errorf("message to user \"%s\" timed out", name)
-			return
+			err := fmt.Errorf("message to user \"%s\" timed out", name)
+			log.Println(err)
 			//
 		}
 	})()
-	return <-errChan
+	return nil
 }
 
 func (r *Room) getUser(name string) (*userInfo, error) {
