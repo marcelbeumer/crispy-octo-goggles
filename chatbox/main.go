@@ -20,6 +20,8 @@ type Commands struct {
 	Server struct {
 		ClientServerOpts
 	} `cmd:"client" help:"Start server"`
+	Test struct {
+	} `cmd:"test"   help:"Run non-http test scenario"`
 }
 
 func main() {
@@ -40,5 +42,7 @@ func main() {
 		if err := server.StartServer(addr); err != nil {
 			panic(err)
 		}
+	case "test":
+		fmt.Println("test")
 	}
 }
