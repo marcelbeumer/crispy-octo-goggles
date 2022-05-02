@@ -14,16 +14,27 @@ type Connection struct {
 	ToOther   chan<- message.Message
 }
 
-func NewConnectionForUser(c Channels) Connection {
-	return Connection{
-		FromOther: make(<-chan message.Message),
-		ToOther:   make(chan<- message.Message),
+func NewChannels() *Channels {
+	return &Channels{
+		ToUser: make(chan message.Message),
+		ToRoom: make(chan message.Message),
 	}
 }
 
-func NewConnectionForRoom(c Channels) Connection {
+func NewConnectionForUser(c *Channels) Connection {
+	fromRoom := (<-chan message.Message)(c.ToUser)
+	toRoom := (chan<- message.Message)(c.ToRoom)
 	return Connection{
-		FromOther: make(<-chan message.Message),
-		ToOther:   make(chan<- message.Message),
+		FromOther: fromRoom,
+		ToOther:   toRoom,
+	}
+}
+
+func NewConnectionForRoom(c *Channels) Connection {
+	fromUser := (<-chan message.Message)(c.ToRoom)
+	toUser := (chan<- message.Message)(c.ToUser)
+	return Connection{
+		FromOther: fromUser,
+		ToOther:   toUser,
 	}
 }
