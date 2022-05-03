@@ -48,7 +48,6 @@ func (r *Room) ConnectUser(name string, conn connection.Connection) error {
 				if err := r.handleUserMessage(name, m); err != nil {
 					log.Println(err)
 				}
-				break
 			case <-user.stopCh:
 				// disconnect, stop
 				return
