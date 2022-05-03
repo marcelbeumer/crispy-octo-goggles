@@ -1,143 +1,101 @@
 package user
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/base"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connection"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
 type User struct {
-	name     string
-	uuid     string
-	in       <-chan base.Event
-	out      chan<- base.Event
-	doneCh   chan struct{}
-	room     base.RoomState
-	CanPrint bool
+	conn   connection.Connection
+	stopCh chan struct{}
 }
 
-func (u *User) Start() {
-	if u.doneCh != nil {
-		return
-	}
-	u.doneCh = make(chan struct{})
+func (u *User) ConnectRoom(conn connection.Connection) error {
+	u.DisconnectRoom()
+	u.stopCh = make(chan struct{})
+	u.conn = conn
 	go (func() {
+		stopCh := u.stopCh
+		fromOther := conn.FromOther
 		for {
 			select {
-			case e := <-u.in:
-				if err := u.handleEvent(e); err != nil {
-					fmt.Println(err)
+			case m := <-fromOther:
+				if err := u.handleRoomMessage(m); err != nil {
+					log.Println(err)
 				}
-			case <-u.doneCh:
-				u.doneCh = nil
 				break
+			case <-stopCh:
+				// disconnect, stop
+				return
 			}
 		}
 	})()
+	return nil
 }
 
-func (u *User) Stop() {
-	if u.doneCh != nil {
-		close(u.doneCh)
+func (u *User) DisconnectRoom() {
+	if u.stopCh != nil {
+		close(u.stopCh)
+		u.stopCh = nil
 	}
 }
 
-func (u *User) Wait() {
-	if u.doneCh != nil {
-		<-u.doneCh
+func (u *User) SendMessage(s string) error {
+	if u.stopCh == nil {
+		return errors.New("No connection with room")
 	}
-}
-
-func (u *User) Uuid() string {
-	return u.uuid
-}
-
-func (u *User) Name() string {
-	return u.name
-}
-
-func (u *User) Connect(in <-chan base.Event, out chan<- base.Event) error {
-	u.in = in
-	u.out = out
-	e, err := base.NewEvent(base.Connect, base.UserState{
-		Name:   u.name,
-		Status: base.StatusOnline,
-	}, u.uuid)
+	msg, err := message.NewMessage(message.NEW_MESSAGE, s)
 	if err != nil {
 		return err
 	}
-	u.sendEvent(e)
-	return nil
+	errCh := make(chan error)
+	go (func() {
+		select {
+		case u.conn.ToOther <- msg:
+			errCh <- nil
+			return
+		case <-time.After(time.Second * 2):
+			errCh <- errors.New("message to room timed out")
+			return
+		}
+	})()
+	return <-errCh
 }
 
-func (u *User) SendMessage(m string) {
-	e, err := base.NewEvent(base.SendMessage, m, u.uuid)
-	if err != nil {
-		panic(err)
-	}
-	go u.sendEvent(e)
-}
+func (u *User) handleRoomMessage(m message.Message) error {
+	switch m.Name {
 
-func (u *User) handleEvent(e base.Event) error {
-	switch e.Name {
-
-	case base.RoomStateUpdate:
-		data, err := base.GetData[base.RoomState](e)
+	case message.NEW_USER:
+		data, err := message.GetData[string](m)
 		if err != nil {
 			return err
 		}
-		u.room = data
-
-	case base.NewUser:
-		data, err := base.GetData[base.UserRef](e)
-		if err != nil {
-			return err
-		}
-		name := data.State.Name
-		if data.Uuid == u.uuid {
-			name = fmt.Sprintf("%s (you)", name)
-		}
-		u.printf(
-			"[%s] << %s entered the room >>\n",
+		fmt.Printf(
+			"[%s] <<user \"%s\" entered the room>>\n",
 			time.Now().Local(),
-			name,
+			data,
 		)
 
-	case base.NewMessage:
-		data, err := base.GetData[base.Message](e)
+	case message.NEW_MESSAGE:
+		data, err := message.GetData[message.NewMessageData](m)
 		if err != nil {
 			return err
 		}
-		u.printf("[%s %s] %s\n", time.Now().Local(), data.SenderName, data.Message)
-
-	default:
-		return base.UhandledEventError{Event: e, Receiver: u.uuid}
+		fmt.Printf(
+			"[%s %s] >> %s\n",
+			data.Time.Local(),
+			data.Sender,
+			data.Message,
+		)
 	}
-
 	return nil
 }
 
-func (u *User) sendEvent(e base.Event) {
-	go (func() {
-		u.out <- e
-	})()
-}
-
-func (u *User) printf(format string, a ...any) {
-	if u.CanPrint {
-		s := fmt.Sprintf(format, a...)
-		fmt.Print(s)
-	}
-}
-
-func NewUser(name string, canPrint bool) *User {
-	u := &User{
-		name:     name,
-		CanPrint: canPrint,
-		uuid:     "user:" + uuid.NewString(),
-	}
-	u.Start()
-	return u
+func NewUser() *User {
+	return &User{}
 }

@@ -1,168 +1,150 @@
 package room
 
 import (
-	"errors"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
-	"github.com/google/uuid"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/base"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/lib/channel"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connection"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
-type Room struct {
-	uuid   string
-	inCh   chan base.Event
-	outCh  chan base.Event
-	outChx (*channel.Multiplexer[base.Event])
-	userCh map[string](*<-chan base.Event)
-	doneCh chan struct{}
-	state  base.RoomState
+type userInfo struct {
+	name   string
+	conn   connection.Connection
 	l      *sync.RWMutex
+	stopCh chan struct{}
 }
 
-func (r *Room) Start() {
-	if r.doneCh != nil {
-		return
+type Room struct {
+	users []userInfo
+	l     *sync.RWMutex
+}
+
+func (r *Room) ConnectUser(name string, conn connection.Connection) error {
+	if _, err := r.getUser(name); err == nil {
+		return fmt.Errorf("user \"%s\" already exists", name)
 	}
-	r.doneCh = make(chan struct{})
+
+	r.l.Lock()
+	user := userInfo{
+		name:   name,
+		conn:   conn,
+		l:      &sync.RWMutex{},
+		stopCh: make(chan struct{}),
+	}
+	r.users = append(r.users, user)
+	usernames := make([]string, len(r.users))
+	for i, u := range r.users {
+		usernames[i] = u.name
+	}
+	r.l.Unlock()
+
 	go (func() {
 		for {
 			select {
-			case e := <-r.inCh:
-				if err := r.handleEvent(e); err != nil {
-					fmt.Println("Error handling event", err)
+			case m := <-user.conn.FromOther:
+				if err := r.handleUserMessage(name, m); err != nil {
+					log.Println(err)
 				}
-			case <-r.doneCh:
-				r.doneCh = nil
-				break
+			case <-user.stopCh:
+				// disconnect, stop
+				return
 			}
 		}
-
 	})()
-}
 
-func (r *Room) Stop() {
-	if r.doneCh != nil {
-		close(r.doneCh)
+	msgUser, err := message.NewMessage(message.USER_LIST, usernames)
+	if err != nil {
+		return err
 	}
-}
-
-func (r *Room) Wait() {
-	if r.doneCh != nil {
-		<-r.doneCh
+	if err := r.sendMessageToUser(user.name, msgUser); err != nil {
+		return err
 	}
+
+	msgAll, err := message.NewMessage(message.NEW_USER, user.name)
+	if err != nil {
+		return err
+	}
+	r.broadcastMessage(msgAll, user.name)
+
+	return nil
 }
 
-func (r *Room) handleEvent(e base.Event) error {
-	switch e.Name {
+func (r *Room) DisconnectUser(name string) error {
+	user, err := r.getUser(name)
+	if err != nil {
+		return err
+	}
+	close(user.stopCh)
+	return nil
+}
 
-	case base.Connect:
-		uuid, data, err := unpackUserEvent[base.UserState](*r, e)
+func (r *Room) handleUserMessage(name string, m message.Message) error {
+	switch m.Name {
+	case message.SEND_MESSAGE:
+		mData, err := message.GetData[string](m)
 		if err != nil {
 			return err
 		}
-
-		r.l.Lock()
-		r.state.Users[uuid] = data
-		r.l.Unlock()
-
-		m := base.UserRef{Uuid: uuid, State: data}
-		ne, err := base.NewEvent(base.NewUser, m, r.uuid)
+		mAllData := message.NewMessageData{
+			Sender:  name,
+			Message: string(mData),
+			Time:    time.Now(),
+		}
+		mAll, err := message.NewMessage(message.NEW_MESSAGE, mAllData)
 		if err != nil {
 			return err
 		}
-		r.sendEvent(r.outCh, ne)
-
-	case base.SendMessage:
-		uuid, data, err := unpackUserEvent[string](*r, e)
-		if err != nil {
-			return err
-		}
-
-		r.l.Lock()
-		name := r.state.Users[uuid].Name
-		msg := base.Message{Sender: e.Sender, SenderName: name, Message: data}
-		r.state.Messages = append(r.state.Messages, msg)
-		r.l.Unlock()
-
-		n1, err := base.NewEvent(base.RoomStateUpdate, r.state, r.uuid)
-		if err != nil {
-			return err
-		}
-		n2, err := base.NewEvent(base.NewMessage, msg, r.uuid)
-		if err != nil {
-			return err
-		}
-		r.sendEvent(r.outCh, n1)
-		r.sendEvent(r.outCh, n2)
-
-	default:
-		return base.UhandledEventError{Event: e, Receiver: r.uuid}
+		r.broadcastMessage(mAll)
 	}
 	return nil
 }
 
-func (r *Room) HasUuid(uuid string) bool {
-	for key := range r.userCh {
-		if key == uuid {
-			return true
+func (r *Room) broadcastMessage(msg message.Message, exceptNames ...string) {
+	except := map[string]bool{}
+	for _, n := range exceptNames {
+		except[n] = true
+	}
+	for _, user := range r.users {
+		if !except[user.name] {
+			r.sendMessageToUser(user.name, msg)
 		}
 	}
-	return false
 }
 
-func (r *Room) Connect(uuid string) (in <-chan base.Event, out chan<- base.Event, err error) {
-	if found := r.HasUuid(uuid); found {
-		return nil, nil, errors.New("uuid already added")
+func (r *Room) sendMessageToUser(name string, msg message.Message) error {
+	user, err := r.getUser(name)
+	if err != nil {
+		return err
 	}
-
-	userCh := r.outChx.Add()
-	r.l.Lock()
-	r.state.Users[uuid] = base.UserState{}
-	r.userCh[uuid] = userCh
-	r.l.Unlock()
-
-	in = *userCh
-	out = (chan<- base.Event)(r.inCh)
-
-	return in, out, nil
+	go (func() {
+		select {
+		case user.conn.ToOther <- msg:
+			return
+			//
+		case <-time.After(time.Second * 2):
+			err := fmt.Errorf("message to user \"%s\" timed out", name)
+			log.Println(err)
+			//
+		}
+	})()
+	return nil
 }
 
-func (r *Room) sendEvent(ch chan base.Event, e base.Event) {
-	go (func() {
-		ch <- e
-	})()
+func (r *Room) getUser(name string) (*userInfo, error) {
+	for _, user := range r.users {
+		if user.name == name {
+			return &user, nil
+		}
+	}
+	return nil, fmt.Errorf("user \"%s\" does not exists", name)
 }
 
 func NewRoom() *Room {
-	inCh := make(chan base.Event)
-	outCh := make(chan base.Event)
-	r := &Room{
-		inCh:   inCh,
-		outCh:  outCh,
-		outChx: channel.NewMultiplexer(outCh),
-		state: base.RoomState{
-			Users:    make(map[string]base.UserState),
-			Messages: make([]base.Message, 0),
-		},
-		userCh: make(map[string]*<-chan base.Event),
-		uuid:   "room:" + uuid.NewString(),
-		l:      &sync.RWMutex{},
+	return &Room{
+		users: []userInfo{},
+		l:     &sync.RWMutex{},
 	}
-	r.Start()
-	return r
-}
-
-func unpackUserEvent[T any](r Room, e base.Event) (string, T, error) {
-	uuid := e.Sender
-	data, err := base.GetData[T](e)
-	if err != nil {
-		return uuid, data, err
-	}
-	if found := r.HasUuid(uuid); !found {
-		err := base.NewEventError(e, fmt.Sprintf("user %s not found", uuid))
-		return uuid, data, err
-	}
-	return uuid, data, nil
 }
