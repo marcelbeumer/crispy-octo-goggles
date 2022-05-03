@@ -85,13 +85,13 @@ func (r *Room) DisconnectUser(name string) error {
 func (r *Room) handleUserMessage(name string, m message.Message) error {
 	switch m.Name {
 	case message.SEND_MESSAGE:
-		mData, err := message.GetData[message.MessageData](&m)
+		mData, err := message.GetData[string](m)
 		if err != nil {
 			return err
 		}
 		mAllData := message.NewMessageData{
 			Sender:  name,
-			Message: string(*mData),
+			Message: string(mData),
 			Time:    time.Now(),
 		}
 		mAll, err := message.NewMessage(message.NEW_MESSAGE, mAllData)

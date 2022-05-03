@@ -32,29 +32,30 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	}
 	m.Name = result.Name
 	switch m.Name {
-	case USER_LIST:
-		m.Data = new(string)
-	case NEW_USER:
-		m.Data = new(string)
-	case SEND_MESSAGE:
-		m.Data = new(string)
+	case USER_LIST, NEW_USER, SEND_MESSAGE:
+		var d string
+		if err := json.Unmarshal(result.Data, &d); err != nil {
+			return err
+		}
+		m.Data = d
 	case NEW_MESSAGE:
-		m.Data = NewMessageData{}
+		d := NewMessageData{}
+		if err := json.Unmarshal(result.Data, &d); err != nil {
+			return err
+		}
+		m.Data = NewMessageData(d)
 	default:
 		return fmt.Errorf("unknown message name \"%s\"", m.Name)
-	}
-	if err := json.Unmarshal(result.Data, &m.Data); err != nil {
-		return err
 	}
 	return nil
 }
 
 func NewMessage(name MessageName, data any) (Message, error) {
 	msg := Message{Name: name, Data: data}
-	return msg, ValidateMessage(&msg)
+	return msg, ValidateMessage(msg)
 }
 
-func ValidateMessage(m *Message) error {
+func ValidateMessage(m Message) error {
 	switch m.Name {
 	case USER_LIST:
 		_, err := GetDataType[[]string](m.Data)
@@ -72,12 +73,6 @@ func ValidateMessage(m *Message) error {
 		return fmt.Errorf("unknown message name \"%s\"", m.Name)
 	}
 }
-
-type UserListData []string
-
-type NewUserData string
-
-type MessageData string
 
 type NewMessageData struct {
 	Sender  string    `json:"sender"`
@@ -105,22 +100,20 @@ func NewDataTypeError(v any, expected any) DataTypeError {
 	}
 }
 
-func GetDataType[T any](v any) (*T, error) {
-	// FIXME: this type conversion seems to copy the data instead of reference oly
-	// maybe this is how Go works (only), but not sure
-	data, ok := v.(*T)
+func GetDataType[T any](v any) (T, error) {
+	data, ok := v.(T)
 	if !ok {
 		empty := *new(T)
-		return &empty, NewDataTypeError(v, empty)
+		return empty, NewDataTypeError(v, empty)
 	}
 	return data, nil
 }
 
-func GetData[T any](m *Message) (*T, error) {
+func GetData[T any](m Message) (T, error) {
 	empty := *new(T)
-	err := ValidateMessage(&Message{Name: m.Name, Data: empty})
+	err := ValidateMessage(Message{Name: m.Name, Data: empty})
 	if err != nil {
-		return &empty, fmt.Errorf("invalid request for data: %w", err)
+		return empty, fmt.Errorf("invalid request for data: %w", err)
 	}
-	return GetDataType[T](&m.Data)
+	return GetDataType[T](m.Data)
 }

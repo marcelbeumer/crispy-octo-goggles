@@ -71,7 +71,7 @@ func (u *User) handleRoomMessage(m message.Message) error {
 	switch m.Name {
 
 	case message.NEW_USER:
-		data, err := message.GetData[message.NewUserData](m)
+		data, err := message.GetData[string](m)
 		if err != nil {
 			return err
 		}

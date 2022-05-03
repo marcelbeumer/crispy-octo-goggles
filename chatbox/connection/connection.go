@@ -21,7 +21,7 @@ func NewChannels() *Channels {
 	}
 }
 
-func NewConnectionForUser(c Channels) Connection {
+func NewConnectionForUser(c *Channels) Connection {
 	fromRoom := (<-chan message.Message)(c.ToUser)
 	toRoom := (chan<- message.Message)(c.ToRoom)
 	return Connection{
@@ -30,7 +30,7 @@ func NewConnectionForUser(c Channels) Connection {
 	}
 }
 
-func NewConnectionForRoom(c Channels) Connection {
+func NewConnectionForRoom(c *Channels) Connection {
 	fromUser := (<-chan message.Message)(c.ToRoom)
 	toUser := (chan<- message.Message)(c.ToUser)
 	return Connection{
