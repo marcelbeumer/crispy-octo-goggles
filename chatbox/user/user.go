@@ -6,16 +6,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connection"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
 type User struct {
-	conn   connection.Connection
+	conn   channels.ChannelsOneDir
 	stopCh chan struct{}
 }
 
-func (u *User) ConnectRoom(conn connection.Connection) error {
+func (u *User) ConnectRoom(conn channels.ChannelsOneDir) error {
 	u.DisconnectRoom()
 	u.stopCh = make(chan struct{})
 	u.conn = conn

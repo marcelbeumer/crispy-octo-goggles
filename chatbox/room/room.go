@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connection"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
 type userInfo struct {
 	name   string
-	conn   connection.Connection
+	conn   channels.ChannelsOneDir
 	l      *sync.RWMutex
 	stopCh chan struct{}
 }
@@ -22,7 +22,7 @@ type Room struct {
 	l     *sync.RWMutex
 }
 
-func (r *Room) ConnectUser(name string, conn connection.Connection) error {
+func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
 	if _, err := r.getUser(name); err == nil {
 		return fmt.Errorf("user \"%s\" already exists", name)
 	}

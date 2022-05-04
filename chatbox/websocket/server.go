@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connection"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/room"
 )
@@ -42,12 +42,39 @@ func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("new websocket conn with %s\n", wsConn.RemoteAddr())
 
-	channels := connection.NewChannels()
-	s.room.ConnectUser(username, connection.NewConnectionForRoom(channels))
-	done := make(chan struct{})
-
+	ch := channels.NewChannels()
+	s.room.ConnectUser(username, channels.NewChannelsForRoom(ch))
 	log.Printf("user %s connected from %s\n", username, wsConn.RemoteAddr())
 
+	done := make(chan struct{})
+	defer close(done)
+	wsDone := s.wsReadPump(wsConn, ch, done)
+
+	for {
+		select {
+		case <-wsDone:
+			return
+		case m := <-ch.ToUser:
+			jsonText, err := json.Marshal(m)
+			if err != nil {
+				panic(err)
+			}
+
+			err = wsConn.WriteMessage(ws.TextMessage, jsonText)
+			if err != nil {
+				log.Printf("Write error: %s", err)
+				return
+			}
+		}
+	}
+}
+
+func (s *Server) wsReadPump(
+	wsConn *ws.Conn,
+	ch *channels.Channels,
+	stop chan struct{},
+) (done chan error) {
+	done = make(chan error)
 	go func() {
 		defer close(done)
 		for {
@@ -63,43 +90,21 @@ func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 				if err := json.Unmarshal(p, &m); err != nil {
 					log.Printf("could not parse message: %s\n", err)
 				}
-				go func() {
-					channels.ToRoom <- m
-				}()
+				select {
+				case <-done:
+					return
+				case ch.ToRoom <- m:
+				}
 			default:
 				log.Printf("websocket ignoring message type: %d\n", messageType)
 			}
 		}
 	}()
-
-	for {
-		select {
-
-		case m := <-channels.ToUser:
-			jsonText, err := json.Marshal(m)
-			if err != nil {
-				panic(err)
-			}
-
-			err = wsConn.WriteMessage(ws.TextMessage, jsonText)
-			if err != nil {
-				log.Printf("Write error: %s", err)
-				return
-			}
-
-		case <-done:
-			return
-		}
-	}
+	return
 }
 
 func NewServer() *Server {
 	return &Server{
 		room: room.NewRoom(),
 	}
-}
-
-func StartServer(addr string) (*Server, error) {
-	s := NewServer()
-	return s, s.Start(addr)
 }

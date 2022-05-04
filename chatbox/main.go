@@ -37,15 +37,16 @@ func main() {
 	switch ctx.Command() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		if err := websocket.StartClient(addr, cli.Client.Username); err != nil {
+		c := websocket.NewClient()
+		if err := c.Connect(addr, cli.Client.Username); err != nil {
 			panic(err)
 		}
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		if _, err := websocket.StartServer(addr); err != nil {
+		s := websocket.NewServer()
+		if err := s.Start(addr); err != nil {
 			panic(err)
 		}
 	case "test":
-		fmt.Println("test")
 	}
 }
