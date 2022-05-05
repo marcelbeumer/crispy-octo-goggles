@@ -10,29 +10,6 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
-type UserStore struct {
-	users map[string]userInfo
-	l     *sync.RWMutex
-}
-
-func (u *UserStore) Get(username string) (*userInfo, bool) {
-	u.l.RLock()
-	u.l.RUnlock()
-	return nil, false
-}
-
-func (u *UserStore) Add(username string) error {
-	u.l.Lock()
-	u.l.Unlock()
-	return nil
-}
-
-func (u *UserStore) Remove(username string) error {
-	u.l.Lock()
-	u.l.Unlock()
-	return nil
-}
-
 type userInfo struct {
 	name   string
 	conn   channels.ChannelsOneDir
@@ -40,29 +17,74 @@ type userInfo struct {
 	stopCh chan struct{}
 }
 
+type userStore struct {
+	users map[string]*userInfo
+	l     *sync.RWMutex
+}
+
+func (u *userStore) Keys() []string {
+	keys := make([]string, 0, len(u.users))
+	for k := range u.users {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (u *userStore) Values() []*userInfo {
+	values := make([]*userInfo, 0, len(u.users))
+	for _, v := range u.users {
+		values = append(values, v)
+	}
+	return values
+}
+
+func (u *userStore) Get(username string) (*userInfo, bool) {
+	u.l.RLock()
+	i, ok := u.users[username]
+	u.l.RUnlock()
+	return i, ok
+}
+
+func (u *userStore) Set(username string, info *userInfo) {
+	u.l.Lock()
+	u.users[username] = info
+	u.l.Unlock()
+}
+
+func (u *userStore) Remove(username string) bool {
+	u.l.Lock()
+	if u.users[username] == nil {
+		return false
+	}
+	delete(u.users, username)
+	u.l.Unlock()
+	return true
+}
+
+func newUserStore() *userStore {
+	return &userStore{
+		users: map[string]*userInfo{},
+		l:     &sync.RWMutex{},
+	}
+}
+
 type Room struct {
-	users []userInfo
+	users *userStore
 	l     *sync.RWMutex
 }
 
 func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
-	if _, err := r.getUser(name); err == nil {
+	if _, ok := r.users.Get(name); ok {
 		return fmt.Errorf("user \"%s\" already exists", name)
 	}
 
-	r.l.Lock()
 	user := userInfo{
 		name:   name,
 		conn:   conn,
 		l:      &sync.RWMutex{},
 		stopCh: make(chan struct{}),
 	}
-	r.users = append(r.users, user)
-	usernames := make([]string, len(r.users))
-	for i, u := range r.users {
-		usernames[i] = u.name
-	}
-	r.l.Unlock()
+	r.users.Set(user.name, &user)
 
 	go (func() {
 		for {
@@ -78,7 +100,7 @@ func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
 		}
 	})()
 
-	msgUser, err := message.NewMessage(message.USER_LIST, usernames)
+	msgUser, err := message.NewMessage(message.USER_LIST, r.users.Keys())
 	if err != nil {
 		return err
 	}
@@ -96,11 +118,10 @@ func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
 }
 
 func (r *Room) DisconnectUser(name string) error {
-	user, err := r.getUser(name)
-	if err != nil {
-		return err
+	if user, ok := r.users.Get(name); ok {
+		close(user.stopCh)
 	}
-	close(user.stopCh)
+	_ = r.users.Remove(name)
 	return nil
 }
 
@@ -130,7 +151,7 @@ func (r *Room) broadcastMessage(msg message.Message, exceptNames ...string) {
 	for _, n := range exceptNames {
 		except[n] = true
 	}
-	for _, user := range r.users {
+	for _, user := range r.users.Values() {
 		if !except[user.name] {
 			r.sendMessageToUser(user.name, msg)
 		}
@@ -138,9 +159,9 @@ func (r *Room) broadcastMessage(msg message.Message, exceptNames ...string) {
 }
 
 func (r *Room) sendMessageToUser(name string, msg message.Message) error {
-	user, err := r.getUser(name)
-	if err != nil {
-		return err
+	user, ok := r.users.Get(name)
+	if !ok {
+		return fmt.Errorf("can not send message to unknown user %s", name)
 	}
 	go (func() {
 		select {
@@ -156,18 +177,9 @@ func (r *Room) sendMessageToUser(name string, msg message.Message) error {
 	return nil
 }
 
-func (r *Room) getUser(name string) (*userInfo, error) {
-	for _, user := range r.users {
-		if user.name == name {
-			return &user, nil
-		}
-	}
-	return nil, fmt.Errorf("user \"%s\" does not exists", name)
-}
-
 func NewRoom() *Room {
 	return &Room{
-		users: []userInfo{},
+		users: newUserStore(),
 		l:     &sync.RWMutex{},
 	}
 }
