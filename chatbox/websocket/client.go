@@ -27,14 +27,15 @@ type Client struct {
 	stop       chan struct{}
 }
 
-func (c *Client) Connect(username string, serverAddr string) error {
+func (c *Client) Connect(serverAddr string, username string) error {
+	c.Username = username
+	c.ServerAddr = serverAddr
+
 	if err := c.connectWs(); err != nil {
 		return err
 	}
 	defer c.Disconnect()
 
-	c.Username = username
-	c.ServerAddr = serverAddr
 	c.user = user.NewUser()
 	c.channels = channels.NewChannels()
 	c.user.ConnectRoom(channels.NewChannelsForUser(c.channels))
