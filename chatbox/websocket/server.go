@@ -53,6 +53,9 @@ func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-wsDone:
+			if err := s.room.DisconnectUser(username); err != nil {
+				panic(err)
+			}
 			return
 		case m := <-ch.ToUser:
 			jsonText, err := json.Marshal(m)
