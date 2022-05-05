@@ -10,6 +10,29 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
+type UserStore struct {
+	users map[string]userInfo
+	l     *sync.RWMutex
+}
+
+func (u *UserStore) Get(username string) (*userInfo, bool) {
+	u.l.RLock()
+	u.l.RUnlock()
+	return nil, false
+}
+
+func (u *UserStore) Add(username string) error {
+	u.l.Lock()
+	u.l.Unlock()
+	return nil
+}
+
+func (u *UserStore) Remove(username string) error {
+	u.l.Lock()
+	u.l.Unlock()
+	return nil
+}
+
 type userInfo struct {
 	name   string
 	conn   channels.ChannelsOneDir
