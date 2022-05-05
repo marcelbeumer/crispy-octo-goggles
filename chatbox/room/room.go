@@ -8,6 +8,7 @@ import (
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/mutex"
 )
 
 type userInfo struct {
@@ -17,59 +18,8 @@ type userInfo struct {
 	stopCh chan struct{}
 }
 
-type userStore struct {
-	users map[string]*userInfo
-	l     *sync.RWMutex
-}
-
-func (u *userStore) Keys() []string {
-	keys := make([]string, 0, len(u.users))
-	for k := range u.users {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-func (u *userStore) Values() []*userInfo {
-	values := make([]*userInfo, 0, len(u.users))
-	for _, v := range u.users {
-		values = append(values, v)
-	}
-	return values
-}
-
-func (u *userStore) Get(username string) (*userInfo, bool) {
-	u.l.RLock()
-	i, ok := u.users[username]
-	u.l.RUnlock()
-	return i, ok
-}
-
-func (u *userStore) Set(username string, info *userInfo) {
-	u.l.Lock()
-	u.users[username] = info
-	u.l.Unlock()
-}
-
-func (u *userStore) Remove(username string) bool {
-	u.l.Lock()
-	if u.users[username] == nil {
-		return false
-	}
-	delete(u.users, username)
-	u.l.Unlock()
-	return true
-}
-
-func newUserStore() *userStore {
-	return &userStore{
-		users: map[string]*userInfo{},
-		l:     &sync.RWMutex{},
-	}
-}
-
 type Room struct {
-	users *userStore
+	users *mutex.Map[*userInfo]
 	l     *sync.RWMutex
 }
 
@@ -84,6 +34,7 @@ func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
 		l:      &sync.RWMutex{},
 		stopCh: make(chan struct{}),
 	}
+
 	r.users.Set(user.name, &user)
 
 	go (func() {
@@ -179,7 +130,7 @@ func (r *Room) sendMessageToUser(name string, msg message.Message) error {
 
 func NewRoom() *Room {
 	return &Room{
-		users: newUserStore(),
+		users: mutex.NewMap[*userInfo](),
 		l:     &sync.RWMutex{},
 	}
 }
