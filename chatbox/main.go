@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
@@ -28,6 +29,9 @@ type Commands struct {
 }
 
 func main() {
+	logger := log.NewDefaultLogger()
+	log.SetStandardLogger(logger)
+
 	cli := Commands{}
 	ctx := kong.Parse(
 		&cli,

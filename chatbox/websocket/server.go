@@ -3,11 +3,11 @@ package websocket
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	ws "github.com/gorilla/websocket"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/room"
 )
@@ -18,7 +18,8 @@ var upgrader = ws.Upgrader{
 }
 
 type Server struct {
-	room *room.Room
+	logger log.Logger
+	room   *room.Room
 }
 
 func (s *Server) Start(addr string) error {
@@ -28,31 +29,54 @@ func (s *Server) Start(addr string) error {
 }
 
 func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
-	log.Printf("request from %s\n", r.RemoteAddr)
+	logger := s.logger
+
+	logger.Info(
+		"http request",
+		map[string]any{"remoteAddr": r.RemoteAddr},
+	)
 
 	username := r.URL.Query().Get("username")
 	if username == "" {
-		log.Printf("no username provided")
+		logger.Info(
+			"reject connection",
+			map[string]any{"reason": "no username provided"},
+		)
 		http.Error(w, "No username provided", http.StatusBadRequest)
 		return
 	}
 
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("could not upgrade connection: %s\n", err)
+		logger.Info(
+			"could not upgrade connection",
+			map[string]any{"error": err},
+		)
 		return
 	}
 
 	defer wsConn.Close()
-	log.Printf("new websocket conn with %s\n", wsConn.RemoteAddr())
+	logger.Info(
+		"new websocket connection",
+		map[string]any{"remoteAddr": wsConn.RemoteAddr()},
+	)
 
 	ch := channels.NewChannels()
 	if err := s.room.Connect(username, channels.NewChannelsForRoom(ch)); err != nil {
-		log.Printf("could not connect to room: %s\n", err)
+		logger.Error(
+			"could not connect to room",
+			map[string]any{"remoteAddr": wsConn.RemoteAddr()},
+		)
 		return
 	}
 
-	log.Printf("user %s connected from %s\n", username, wsConn.RemoteAddr())
+	logger.Info(
+		"user connected",
+		map[string]any{
+			"username":   username,
+			"remoteAddr": wsConn.RemoteAddr(),
+		},
+	)
 
 	done := make(chan struct{})
 	defer close(done)
@@ -73,7 +97,10 @@ func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 
 			err = wsConn.WriteMessage(ws.TextMessage, jsonText)
 			if err != nil {
-				log.Printf("Write error: %s", err)
+				logger.Info(
+					"websocket write error",
+					map[string]any{"error": err},
+				)
 				return
 			}
 		}
@@ -85,21 +112,33 @@ func (s *Server) wsReadPump(
 	ch *channels.Channels,
 	stop chan struct{},
 ) (done chan error) {
+	logger := s.logger
 	done = make(chan error)
 	go func() {
 		defer close(done)
 		for {
 			messageType, p, err := wsConn.ReadMessage()
 			if err != nil {
-				log.Printf("websocket read error: %s\n", err)
+				logger.Info(
+					"websocket read error",
+					map[string]any{"error": err},
+				)
 				return
 			}
 			switch messageType {
 			case ws.TextMessage:
-				log.Printf("websocket received message: %s\n", string(p))
+				logger.Debug(
+					"websocket received message",
+					map[string]any{"value": string(p)},
+				)
+
 				m := message.Message{}
 				if err := json.Unmarshal(p, &m); err != nil {
-					log.Printf("could not parse message: %s\n", err)
+					logger.Info(
+						"could not parse message",
+						map[string]any{"error": err},
+					)
+					continue
 				}
 				select {
 				case <-done:
@@ -107,15 +146,19 @@ func (s *Server) wsReadPump(
 				case ch.ToRoom <- m:
 				}
 			default:
-				log.Printf("websocket ignoring message type: %d\n", messageType)
+				logger.Info(
+					"websocket ignoring message type: %d",
+					map[string]any{"messageType": messageType},
+				)
 			}
 		}
 	}()
 	return
 }
 
-func NewServer() *Server {
+func NewServer(logger log.Logger) *Server {
 	return &Server{
-		room: room.NewRoom(),
+		logger: logger,
+		room:   room.NewRoom(),
 	}
 }
