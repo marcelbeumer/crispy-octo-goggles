@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	ws "github.com/gorilla/websocket"
@@ -23,7 +22,11 @@ type Server struct {
 }
 
 func (s *Server) Start(addr string) error {
-	fmt.Println("starting server on", addr)
+	logger := s.logger
+	logger.Info(
+		"starting server",
+		map[string]any{"addr": addr},
+	)
 	err := http.ListenAndServe(addr, http.HandlerFunc(s.handleHttp))
 	return err
 }

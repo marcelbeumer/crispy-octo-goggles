@@ -1,14 +1,17 @@
 package log
 
 import (
-	"github.com/sirupsen/logrus"
-	logrusadapter "logur.dev/adapter/logrus"
+	"os"
+
+	"github.com/rs/zerolog"
+	zerologadapter "logur.dev/adapter/zerolog"
 )
 
 func NewDefaultLogger() *LoggerAdapter {
-	lr := logrus.New()
-	lr.SetLevel(logrus.DebugLevel)
+	l := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	l.Level(zerolog.DebugLevel)
+	logger := zerologadapter.New(l)
 	return &LoggerAdapter{
-		logger: logrusadapter.New(lr),
+		logger: logger,
 	}
 }
