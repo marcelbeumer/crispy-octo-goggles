@@ -32,8 +32,14 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	}
 	m.Name = result.Name
 	switch m.Name {
-	case USER_LIST, NEW_USER, SEND_MESSAGE:
+	case NEW_USER, SEND_MESSAGE:
 		var d string
+		if err := json.Unmarshal(result.Data, &d); err != nil {
+			return err
+		}
+		m.Data = d
+	case USER_LIST:
+		var d []string
 		if err := json.Unmarshal(result.Data, &d); err != nil {
 			return err
 		}

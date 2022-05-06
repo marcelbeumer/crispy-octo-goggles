@@ -6,17 +6,17 @@ import (
 	"log"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/connection"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 )
 
 type User struct {
-	conn   connection.Connection
+	conn   channels.ChannelsOneDir
 	stopCh chan struct{}
 }
 
-func (u *User) ConnectRoom(conn connection.Connection) error {
-	u.DisconnectRoom()
+func (u *User) Connect(conn channels.ChannelsOneDir) error {
+	u.Disconnect()
 	u.stopCh = make(chan struct{})
 	u.conn = conn
 	go (func() {
@@ -25,7 +25,7 @@ func (u *User) ConnectRoom(conn connection.Connection) error {
 		for {
 			select {
 			case m := <-fromOther:
-				if err := u.handleRoomMessage(m); err != nil {
+				if err := u.handleMessage(m); err != nil {
 					log.Println(err)
 				}
 				break
@@ -38,7 +38,7 @@ func (u *User) ConnectRoom(conn connection.Connection) error {
 	return nil
 }
 
-func (u *User) DisconnectRoom() {
+func (u *User) Disconnect() {
 	if u.stopCh != nil {
 		close(u.stopCh)
 		u.stopCh = nil
@@ -67,7 +67,7 @@ func (u *User) SendMessage(s string) error {
 	return <-errCh
 }
 
-func (u *User) handleRoomMessage(m message.Message) error {
+func (u *User) handleMessage(m message.Message) error {
 	switch m.Name {
 
 	case message.NEW_USER:
