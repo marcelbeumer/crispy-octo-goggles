@@ -2,7 +2,6 @@
 
 TODO:
 
-- Proper structured logging, with levels
 - Simple CLI UI for client:
   - Left panel: messages
   - Right panel: user list

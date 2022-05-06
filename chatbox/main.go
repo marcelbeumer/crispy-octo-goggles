@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
@@ -28,6 +29,9 @@ type Commands struct {
 }
 
 func main() {
+	logger := log.NewDefaultLogger()
+	log.SetStandardLogger(logger)
+
 	cli := Commands{}
 	ctx := kong.Parse(
 		&cli,
@@ -37,13 +41,13 @@ func main() {
 	switch ctx.Command() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		c := websocket.NewClient()
+		c := websocket.NewClient(logger)
 		if err := c.Connect(addr, cli.Client.Username); err != nil {
 			panic(err)
 		}
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		s := websocket.NewServer()
+		s := websocket.NewServer(logger)
 		if err := s.Start(addr); err != nil {
 			panic(err)
 		}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"os/signal"
@@ -13,11 +12,13 @@ import (
 
 	ws "github.com/gorilla/websocket"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/channels"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/message"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/user"
 )
 
 type Client struct {
+	logger     log.Logger
 	Username   string
 	ServerAddr string
 	wsConn     *ws.Conn
@@ -99,21 +100,32 @@ func (c *Client) wsReadPump(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	toUser := c.channels.ToUser
 	wsConn := c.wsConn
+	logger := c.logger
 
 	go func() {
 		defer close(done)
 		for {
 			messageType, p, err := wsConn.ReadMessage()
 			if err != nil {
-				log.Printf("websocket read error: %s\n", err)
+				logger.Info(
+					"websocket read error",
+					map[string]any{"error": err},
+				)
 				return
 			}
 			switch messageType {
 			case ws.TextMessage:
-				// log.Printf("websocket received message: %s\n", string(p))
+				logger.Debug(
+					"websocket received message",
+					map[string]any{"value": string(p)},
+				)
 				m := message.Message{}
 				if err := json.Unmarshal(p, &m); err != nil {
-					log.Printf("could not parse message: %s\n", err)
+					logger.Info(
+						"could not parse message",
+						map[string]any{"error": err},
+					)
+					continue
 				}
 				select {
 				case <-stop:
@@ -122,7 +134,10 @@ func (c *Client) wsReadPump(stop <-chan struct{}) (done chan error) {
 					//
 				}
 			default:
-				log.Printf("websocket ignoring message type: %d\n", messageType)
+				logger.Info(
+					"websocket ignoring message type",
+					map[string]any{"messageType": messageType},
+				)
 			}
 		}
 	}()
@@ -135,6 +150,7 @@ func (c *Client) wsWritePump(stop <-chan struct{}) (done chan error) {
 	input := []byte{}
 	stdinCh := c.stdinCh
 	wsConn := c.wsConn
+	logger := c.logger
 
 	go func() {
 		defer close(done)
@@ -157,7 +173,10 @@ func (c *Client) wsWritePump(stop <-chan struct{}) (done chan error) {
 					// log.Printf("websocket sending message: %s\n", jsonText)
 					err = wsConn.WriteMessage(ws.TextMessage, jsonText)
 					if err != nil {
-						log.Printf("write error: %s", err)
+						logger.Info(
+							"websocket write error",
+							map[string]any{"error": err},
+						)
 						return
 					}
 				} else {
@@ -173,6 +192,7 @@ func (c *Client) wsWritePump(stop <-chan struct{}) (done chan error) {
 func (c *Client) waitInterrupt(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	interrupt := make(chan os.Signal, 1)
+	logger := c.logger
 	signal.Notify(interrupt, os.Interrupt)
 	wsConn := c.wsConn
 
@@ -183,7 +203,7 @@ func (c *Client) waitInterrupt(stop <-chan struct{}) (done chan error) {
 			case <-stop:
 				return
 			case <-interrupt:
-				log.Println("interrupt")
+				logger.Info("os signal interrupt")
 
 				if err := wsConn.WriteMessage(
 					ws.CloseMessage,
@@ -219,6 +239,8 @@ func (c *Client) connectWs() error {
 	return nil
 }
 
-func NewClient() *Client {
-	return &Client{}
+func NewClient(logger log.Logger) *Client {
+	return &Client{
+		logger: logger,
+	}
 }
