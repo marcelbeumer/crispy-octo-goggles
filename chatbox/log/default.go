@@ -8,8 +8,12 @@ import (
 )
 
 func NewDefaultLogger() *LoggerAdapter {
-	l := zerolog.New(os.Stderr).With().Timestamp().Logger()
-	l.Level(zerolog.DebugLevel)
+	l := zerolog.
+		New(os.Stderr).
+		With().
+		Timestamp().
+		Logger().
+		Level(zerolog.InfoLevel)
 	logger := zerologadapter.New(l)
 	return &LoggerAdapter{
 		logger: logger,
