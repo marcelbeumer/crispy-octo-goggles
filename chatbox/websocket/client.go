@@ -24,7 +24,7 @@ type Client struct {
 	channels   *channels.Channels
 	user       *user.User
 	stdinCh    chan byte
-	stop       chan struct{}
+	disconnect chan bool
 }
 
 func (c *Client) Connect(serverAddr string, username string) error {
@@ -40,31 +40,36 @@ func (c *Client) Connect(serverAddr string, username string) error {
 	c.channels = channels.NewChannels()
 	c.user.Connect(channels.NewChannelsForUser(c.channels))
 	c.stdinCh = make(chan byte)
+	c.disconnect = make(chan bool)
 
-	c.stop = make(chan struct{})
-	defer close(c.stop)
-
+	stop := make(chan struct{})
 	var err error
+
 	select {
-	case <-c.stop:
-	case err = <-c.wsReadPump(c.stop):
-	case err = <-c.wsWritePump(c.stop):
-	case err = <-c.stdinPump(c.stop):
-	case err = <-c.waitInterrupt(c.stop):
+	case <-c.disconnect:
+	case err = <-c.wsReadPump(stop):
+	case err = <-c.wsWritePump(stop):
+	case err = <-c.stdinPump(stop):
+	case err = <-c.waitInterrupt(stop):
 	}
+
+	close(stop)
 	return err
 }
 
 func (c *Client) Disconnect() error {
-	if c.wsConn == nil {
-		return errors.New("not connected")
+	var err error
+	if c.disconnect != nil {
+		c.disconnect <- true
 	}
-	wsConn := c.wsConn
-	c.wsConn = nil
-	return wsConn.Close()
+	if c.wsConn != nil {
+		err = c.wsConn.Close()
+		c.wsConn = nil
+	}
+	return err
 }
 
-func (c *Client) stdinPump(stop chan struct{}) (done chan error) {
+func (c *Client) stdinPump(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	in := bufio.NewReader(os.Stdin)
 	ch := c.stdinCh
@@ -90,7 +95,7 @@ func (c *Client) stdinPump(stop chan struct{}) (done chan error) {
 	return
 }
 
-func (c *Client) wsReadPump(stop chan struct{}) (done chan error) {
+func (c *Client) wsReadPump(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	toUser := c.channels.ToUser
 	wsConn := c.wsConn
@@ -125,7 +130,7 @@ func (c *Client) wsReadPump(stop chan struct{}) (done chan error) {
 	return
 }
 
-func (c *Client) wsWritePump(stop chan struct{}) (done chan error) {
+func (c *Client) wsWritePump(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	input := []byte{}
 	stdinCh := c.stdinCh
@@ -165,7 +170,7 @@ func (c *Client) wsWritePump(stop chan struct{}) (done chan error) {
 	return
 }
 
-func (c *Client) waitInterrupt(stop chan struct{}) (done chan error) {
+func (c *Client) waitInterrupt(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
