@@ -29,21 +29,29 @@ func (s *Server) Start(addr string) error {
 
 func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 	log.Printf("request from %s\n", r.RemoteAddr)
+
 	username := r.URL.Query().Get("username")
 	if username == "" {
 		log.Printf("no username provided")
 		http.Error(w, "No username provided", http.StatusBadRequest)
 		return
 	}
+
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("could not upgrade connection: %s\n", err)
 		return
 	}
+
+	defer wsConn.Close()
 	log.Printf("new websocket conn with %s\n", wsConn.RemoteAddr())
 
 	ch := channels.NewChannels()
-	s.room.ConnectUser(username, channels.NewChannelsForRoom(ch))
+	if err := s.room.Connect(username, channels.NewChannelsForRoom(ch)); err != nil {
+		log.Printf("could not connect to room: %s\n", err)
+		return
+	}
+
 	log.Printf("user %s connected from %s\n", username, wsConn.RemoteAddr())
 
 	done := make(chan struct{})
@@ -53,7 +61,7 @@ func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-wsDone:
-			if err := s.room.DisconnectUser(username); err != nil {
+			if err := s.room.Disconnect(username); err != nil {
 				panic(err)
 			}
 			return

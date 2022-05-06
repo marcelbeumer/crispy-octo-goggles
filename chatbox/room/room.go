@@ -12,10 +12,11 @@ import (
 )
 
 type userInfo struct {
-	name   string
-	conn   channels.ChannelsOneDir
-	l      *sync.RWMutex
-	stopCh chan struct{}
+	name string
+	conn channels.ChannelsOneDir
+	l    *sync.RWMutex
+	stop chan bool
+	done chan struct{}
 }
 
 type Room struct {
@@ -23,39 +24,47 @@ type Room struct {
 	l     *sync.RWMutex
 }
 
-func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
-	if _, ok := r.users.Get(name); ok {
-		return fmt.Errorf("user \"%s\" already exists", name)
+func (r *Room) Connect(username string, conn channels.ChannelsOneDir) error {
+	if _, ok := r.users.Get(username); ok {
+		return fmt.Errorf("user \"%s\" already exists", username)
 	}
 
 	user := userInfo{
-		name:   name,
-		conn:   conn,
-		l:      &sync.RWMutex{},
-		stopCh: make(chan struct{}),
+		name: username,
+		conn: conn,
+		l:    &sync.RWMutex{},
+		stop: make(chan bool),
+		done: make(chan struct{}),
 	}
+	go func() { // safe controller for close
+		select {
+		case <-user.done:
+		case <-user.stop:
+			close(user.done)
+		}
+	}()
 
 	r.users.Set(user.name, &user)
 
-	go (func() {
+	go func() {
 		for {
 			select {
 			case m := <-user.conn.FromOther:
-				if err := r.handleUserMessage(name, m); err != nil {
+				if err := r.handleMessage(username, m); err != nil {
 					log.Println(err)
 				}
-			case <-user.stopCh:
+			case <-user.done:
 				// disconnect, stop
 				return
 			}
 		}
-	})()
+	}()
 
 	msgUser, err := message.NewMessage(message.USER_LIST, r.users.Keys())
 	if err != nil {
 		return err
 	}
-	if err := r.sendMessageToUser(user.name, msgUser); err != nil {
+	if err := r.sendMessage(user.name, msgUser); err != nil {
 		return err
 	}
 
@@ -68,15 +77,15 @@ func (r *Room) ConnectUser(name string, conn channels.ChannelsOneDir) error {
 	return nil
 }
 
-func (r *Room) DisconnectUser(name string) error {
-	if user, ok := r.users.Get(name); ok {
-		close(user.stopCh)
+func (r *Room) Disconnect(username string) error {
+	if user, ok := r.users.Get(username); ok {
+		user.stop <- true
 	}
-	_ = r.users.Remove(name)
+	_ = r.users.Remove(username)
 	return nil
 }
 
-func (r *Room) handleUserMessage(name string, m message.Message) error {
+func (r *Room) handleMessage(username string, m message.Message) error {
 	switch m.Name {
 	case message.SEND_MESSAGE:
 		mData, err := message.GetData[string](m)
@@ -84,7 +93,7 @@ func (r *Room) handleUserMessage(name string, m message.Message) error {
 			return err
 		}
 		mAllData := message.NewMessageData{
-			Sender:  name,
+			Sender:  username,
 			Message: string(mData),
 			Time:    time.Now(),
 		}
@@ -104,15 +113,15 @@ func (r *Room) broadcastMessage(msg message.Message, exceptNames ...string) {
 	}
 	for _, user := range r.users.Values() {
 		if !except[user.name] {
-			r.sendMessageToUser(user.name, msg)
+			r.sendMessage(user.name, msg)
 		}
 	}
 }
 
-func (r *Room) sendMessageToUser(name string, msg message.Message) error {
-	user, ok := r.users.Get(name)
+func (r *Room) sendMessage(username string, msg message.Message) error {
+	user, ok := r.users.Get(username)
 	if !ok {
-		return fmt.Errorf("can not send message to unknown user %s", name)
+		return fmt.Errorf("can not send message to unknown user %s", username)
 	}
 	go (func() {
 		select {
@@ -120,7 +129,7 @@ func (r *Room) sendMessageToUser(name string, msg message.Message) error {
 			return
 			//
 		case <-time.After(time.Second * 2):
-			err := fmt.Errorf("message to user \"%s\" timed out", name)
+			err := fmt.Errorf("message to user \"%s\" timed out", username)
 			log.Println(err)
 			//
 		}

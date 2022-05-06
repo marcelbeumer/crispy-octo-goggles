@@ -15,8 +15,8 @@ type User struct {
 	stopCh chan struct{}
 }
 
-func (u *User) ConnectRoom(conn channels.ChannelsOneDir) error {
-	u.DisconnectRoom()
+func (u *User) Connect(conn channels.ChannelsOneDir) error {
+	u.Disconnect()
 	u.stopCh = make(chan struct{})
 	u.conn = conn
 	go (func() {
@@ -25,7 +25,7 @@ func (u *User) ConnectRoom(conn channels.ChannelsOneDir) error {
 		for {
 			select {
 			case m := <-fromOther:
-				if err := u.handleRoomMessage(m); err != nil {
+				if err := u.handleMessage(m); err != nil {
 					log.Println(err)
 				}
 				break
@@ -38,7 +38,7 @@ func (u *User) ConnectRoom(conn channels.ChannelsOneDir) error {
 	return nil
 }
 
-func (u *User) DisconnectRoom() {
+func (u *User) Disconnect() {
 	if u.stopCh != nil {
 		close(u.stopCh)
 		u.stopCh = nil
@@ -67,7 +67,7 @@ func (u *User) SendMessage(s string) error {
 	return <-errCh
 }
 
-func (u *User) handleRoomMessage(m message.Message) error {
+func (u *User) handleMessage(m message.Message) error {
 	switch m.Name {
 
 	case message.NEW_USER:

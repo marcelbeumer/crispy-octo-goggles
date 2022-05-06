@@ -38,7 +38,7 @@ func (c *Client) Connect(serverAddr string, username string) error {
 
 	c.user = user.NewUser()
 	c.channels = channels.NewChannels()
-	c.user.ConnectRoom(channels.NewChannelsForUser(c.channels))
+	c.user.Connect(channels.NewChannelsForUser(c.channels))
 	c.stdinCh = make(chan byte)
 
 	c.stop = make(chan struct{})
