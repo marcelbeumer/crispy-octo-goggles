@@ -26,6 +26,7 @@ type Client struct {
 	user       *user.User
 	stdinCh    chan byte
 	disconnect chan bool
+	done       chan struct{}
 }
 
 func (c *Client) Connect(serverAddr string, username string) error {
@@ -42,19 +43,18 @@ func (c *Client) Connect(serverAddr string, username string) error {
 	c.user.Connect(channels.NewChannelsForUser(c.channels))
 	c.stdinCh = make(chan byte)
 	c.disconnect = make(chan bool)
-
-	stop := make(chan struct{})
+	c.done = make(chan struct{})
 	var err error
 
 	select {
 	case <-c.disconnect:
-	case err = <-c.wsReadPump(stop):
-	case err = <-c.wsWritePump(stop):
-	case err = <-c.stdinPump(stop):
-	case err = <-c.waitInterrupt(stop):
+	case err = <-c.wsReadPump(c.done):
+	case err = <-c.wsWritePump(c.done):
+	case err = <-c.stdinPump(c.done):
+	case err = <-c.waitInterrupt(c.done):
 	}
 
-	close(stop)
+	close(c.done)
 	return err
 }
 
@@ -68,6 +68,32 @@ func (c *Client) Disconnect() error {
 		c.wsConn = nil
 	}
 	return err
+}
+
+func (c *Client) SendMessage(m message.Message) {
+	wsConn := c.wsConn
+	logger := c.logger
+	jsonText, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
+	// log.Printf("websocket sending message: %s\n", jsonText)
+	err = wsConn.WriteMessage(ws.TextMessage, jsonText)
+	if err != nil {
+		logger.Info(
+			"websocket write error",
+			map[string]any{"error": err},
+		)
+		return
+	}
+}
+
+func (c *Client) ReceiveMessage(m message.Message) <-chan message.Message {
+	return c.channels.ToUser
+}
+
+func (c *Client) Done() <-chan struct{} {
+	return c.done
 }
 
 func (c *Client) stdinPump(stop <-chan struct{}) (done chan error) {
@@ -150,8 +176,6 @@ func (c *Client) wsWritePump(stop <-chan struct{}) (done chan error) {
 	done = make(chan error)
 	input := []byte{}
 	stdinCh := c.stdinCh
-	wsConn := c.wsConn
-	logger := c.logger
 
 	go func() {
 		defer close(done)
@@ -167,19 +191,7 @@ func (c *Client) wsWritePump(stop <-chan struct{}) (done chan error) {
 					if err != nil {
 						panic(err)
 					}
-					jsonText, err := json.Marshal(m)
-					if err != nil {
-						panic(err)
-					}
-					// log.Printf("websocket sending message: %s\n", jsonText)
-					err = wsConn.WriteMessage(ws.TextMessage, jsonText)
-					if err != nil {
-						logger.Info(
-							"websocket write error",
-							map[string]any{"error": err},
-						)
-						return
-					}
+					c.SendMessage(m)
 				} else {
 					input = append(input, s)
 				}
