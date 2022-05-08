@@ -78,8 +78,9 @@ func (c *Client) stdinPump(stop <-chan struct{}) (done chan error) {
 	go func() {
 		defer close(done)
 		for {
-			// FIXME could wait here forever but no idea
-			// how to cancel/abort a Reader from stdin
+			// XXX there is no way to interrupt this Read so we leave it
+			// waiting when we are disconnected and it will exit
+			// at *some* point
 			b, err := in.ReadByte()
 			if err != nil {
 				continue
