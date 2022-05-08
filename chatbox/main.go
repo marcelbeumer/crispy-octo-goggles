@@ -12,32 +12,37 @@ type ClientServerOpts struct {
 	Host string `help:"Server host." short:"h" default:"127.0.0.1"`
 	Port int    `help:"Server port." short:"p" default:"9998"`
 }
+
 type ClientOpts struct {
 	Username string `help:"Username." required:"" short:"u"`
 }
 
 type Commands struct {
+	Verbose     bool `help:"Verbose (logging info)"       short:"v"`
+	VeryVerbose bool `help:"Very verbose (logging debug)" short:"V"`
+
 	Client struct {
 		ClientServerOpts
 		ClientOpts
-	} `cmd:"client" help:"Start client"`
+	} `help:"Start client"               cmd:"client"`
 	Server struct {
 		ClientServerOpts
-	} `cmd:"client" help:"Start server"`
+	} `help:"Start server"               cmd:"client"`
 	Test struct {
-	} `cmd:"test"   help:"Run non-http test scenario"`
+	} `help:"Run non-http test scenario" cmd:"test"`
 }
 
 func main() {
-	logger := log.NewDefaultLogger()
-	log.SetStandardLogger(logger)
-
 	cli := Commands{}
 	ctx := kong.Parse(
 		&cli,
 		kong.Name("chatbox"),
 		kong.UsageOnError(),
 	)
+
+	logger := log.NewDefaultLogger(cli.Verbose, cli.VeryVerbose)
+	log.SetStandardLogger(logger)
+
 	switch ctx.Command() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)

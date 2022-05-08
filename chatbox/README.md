@@ -2,7 +2,6 @@
 
 TODO:
 
-- Control log level from cli (maybe just `-v` for info and `-vv` for debug)
 - Simple CLI UI for client:
   - Left panel: messages
   - Right panel: user list
