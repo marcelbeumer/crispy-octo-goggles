@@ -26,7 +26,7 @@ type Client struct {
 	user       *user.User
 	stdinCh    chan byte
 	disconnect chan bool
-	done       chan struct{}
+	stop       chan struct{}
 }
 
 func (c *Client) Connect(serverAddr string, username string) error {
@@ -43,18 +43,18 @@ func (c *Client) Connect(serverAddr string, username string) error {
 	c.user.Connect(channels.NewChannelsForUser(c.channels))
 	c.stdinCh = make(chan byte)
 	c.disconnect = make(chan bool)
-	c.done = make(chan struct{})
+	c.stop = make(chan struct{})
 	var err error
 
 	select {
 	case <-c.disconnect:
-	case err = <-c.wsReadPump(c.done):
-	case err = <-c.wsWritePump(c.done):
-	case err = <-c.stdinPump(c.done):
-	case err = <-c.waitInterrupt(c.done):
+	case err = <-c.wsReadPump(c.stop):
+	case err = <-c.wsWritePump(c.stop):
+	case err = <-c.stdinPump(c.stop):
+	case err = <-c.waitInterrupt(c.stop):
 	}
 
-	close(c.done)
+	close(c.stop)
 	return err
 }
 
@@ -92,8 +92,8 @@ func (c *Client) ReceiveMessage(m message.Message) <-chan message.Message {
 	return c.channels.ToUser
 }
 
-func (c *Client) Done() <-chan struct{} {
-	return c.done
+func (c *Client) Stopped() <-chan struct{} {
+	return c.stop
 }
 
 func (c *Client) stdinPump(stop <-chan struct{}) (done chan error) {

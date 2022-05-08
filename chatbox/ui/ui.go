@@ -10,7 +10,7 @@ import (
 type Client interface {
 	SendMessage(m message.Message)
 	ReceiveMessage() <-chan message.Message
-	Done() <-chan struct{}
+	Stopped() <-chan struct{}
 }
 
 func StartUI() error {
