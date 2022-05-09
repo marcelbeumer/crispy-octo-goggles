@@ -88,7 +88,7 @@ func (c *Client) SendMessage(m message.Message) {
 	}
 }
 
-func (c *Client) ReceiveMessage(m message.Message) <-chan message.Message {
+func (c *Client) ReceiveMessage() <-chan message.Message {
 	return c.channels.ToUser
 }
 

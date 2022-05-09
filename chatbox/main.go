@@ -5,6 +5,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/ui"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
@@ -47,9 +48,20 @@ func main() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		c := websocket.NewClient(logger)
+		// go func() {
 		if err := c.Connect(addr, cli.Client.Username); err != nil {
 			panic(err)
 		}
+		// }()
+		// time.Sleep(5)
+		// ui, err := ui.NewUI(c, logger)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// if err := ui.Start(); err != nil {
+		// 	panic(err)
+		// }
+
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		s := websocket.NewServer(logger)
@@ -57,5 +69,14 @@ func main() {
 			panic(err)
 		}
 	case "test":
+		c := ui.NewTestClient(logger)
+		c.Start()
+		ui, err := ui.NewUI(c, logger)
+		if err != nil {
+			panic(err)
+		}
+		if err := ui.Start(); err != nil {
+			panic(err)
+		}
 	}
 }
