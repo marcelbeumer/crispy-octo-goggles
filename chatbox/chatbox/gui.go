@@ -52,7 +52,7 @@ func (f *GUIFrontend) Start() error {
 	var err error
 	select {
 	case err = <-f.guiPump():
-	case err = <-f.pumpEvents(layoutReady, stop):
+	case err = <-f.eventPump(layoutReady, stop):
 	}
 	return err
 }
@@ -75,7 +75,7 @@ func (f *GUIFrontend) guiPump() <-chan error {
 	return done
 }
 
-func (f *GUIFrontend) pumpEvents(start <-chan struct{}, stop <-chan struct{}) <-chan error {
+func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-chan error {
 	logger := f.logger
 	done := make(chan error)
 
