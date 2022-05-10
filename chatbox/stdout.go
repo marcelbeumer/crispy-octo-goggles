@@ -3,6 +3,7 @@ package chatbox
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"time"
@@ -21,7 +22,7 @@ func (f *StdoutFrontend) Start() error {
 
 	var err error
 	select {
-	case err = <-f.pumpEvents(stop):
+	case <-f.pumpEvents(stop):
 	case err = <-f.pumpStdin(stop):
 	}
 	return err
@@ -62,40 +63,55 @@ func (f *StdoutFrontend) pumpStdin(stop <-chan struct{}) <-chan error {
 	return done
 }
 
-func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan error {
+func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan struct{} {
+	done := make(chan struct{})
 	logger := f.logger
-	done := make(chan error)
 	go func() {
 		defer close(done)
 		for {
 			select {
 			case <-stop:
 				return
-			case <-f.conn.Closed():
+			default:
+			}
+
+			e, err := f.conn.ReadEvent()
+
+			if err == io.EOF {
+				logger.Info("read event EOF")
 				return
-			case e := <-f.conn.ReceiveEvent():
-				switch t := e.(type) {
-				case EventUserListUpdate:
-					//
-				case EventNewUser:
-					fmt.Printf(
-						"[%s] <<user \"%s\" entered the room>>\n",
-						t.Time.Local(),
-						t.Name,
-					)
-				case EventNewMessage:
-					fmt.Printf(
-						"[%s %s] >> %s\n",
-						t.Time.Local(),
-						t.Sender,
-						t.Message,
-					)
-				default:
-					logger.Warn("unhandled event type",
-						map[string]any{
-							"type": reflect.TypeOf(e).String(),
-						})
-				}
+			}
+
+			if err != nil {
+				logger.Error("read event error (sleep)",
+					map[string]any{
+						"error": err.Error(),
+					})
+				time.Sleep(time.Second)
+				continue
+			}
+
+			switch t := e.(type) {
+			case EventUserListUpdate:
+				//
+			case EventNewUser:
+				fmt.Printf(
+					"[%s] <<user \"%s\" entered the room>>\n",
+					t.Time.Local(),
+					t.Name,
+				)
+			case EventNewMessage:
+				fmt.Printf(
+					"[%s %s] >> %s\n",
+					t.Time.Local(),
+					t.Sender,
+					t.Message,
+				)
+			default:
+				logger.Warn("unhandled event type",
+					map[string]any{
+						"type": reflect.TypeOf(e).String(),
+					})
 			}
 		}
 	}()

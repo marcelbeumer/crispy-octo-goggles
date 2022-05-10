@@ -2,9 +2,11 @@ package chatbox
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
@@ -27,20 +29,46 @@ func (f *GUIFrontend) Start() error {
 		close(layoutReady)
 	}))
 
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, f.quit); err != nil {
+	var err error
+
+	err = g.SetKeybinding(
+		"",
+		gocui.KeyCtrlC,
+		gocui.ModNone,
+		f.quit,
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("", gocui.MouseLeft, gocui.ModNone, f.activateView); err != nil {
+	err = g.SetKeybinding(
+		"",
+		gocui.MouseLeft,
+		gocui.ModNone,
+		f.activateView,
+	)
+	if err != nil {
 		return err
 	}
 
-	if err := g.SetKeybinding("", gocui.KeyTab, gocui.ModNone, f.nextView); err != nil {
+	err = g.SetKeybinding(
+		"",
+		gocui.KeyTab,
+		gocui.ModNone,
+		f.nextView,
+	)
+	if err != nil {
 		logger.Error(err.Error())
 		return err
 	}
 
-	if err := g.SetKeybinding("input", gocui.KeyEnter, gocui.ModNone, f.sendMessageFromInput); err != nil {
+	err = g.SetKeybinding("input",
+		gocui.KeyEnter,
+		gocui.ModNone,
+		f.sendMessageFromInput,
+	)
+
+	if err != nil {
 		logger.Error(err.Error())
 		return err
 	}
@@ -48,7 +76,6 @@ func (f *GUIFrontend) Start() error {
 	stop := make(chan struct{})
 	defer close(stop)
 
-	var err error
 	select {
 	case err = <-f.guiPump():
 	case err = <-f.eventPump(layoutReady, stop):
@@ -80,53 +107,63 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 
 	go func() {
 		defer close(done)
-
-		select {
-		case <-stop:
-			return
-		case <-start:
-		}
+		<-start
 
 		for {
 			select {
 			case <-stop:
 				return
-			case <-f.conn.Closed():
+			default:
+			}
+
+			e, err := f.conn.ReadEvent()
+
+			if err == io.EOF {
+				logger.Info("read event EOF")
 				return
-			case e := <-f.conn.ReceiveEvent():
-				switch t := e.(type) {
-				case EventUserListUpdate:
-					if err := f.setUsers(t.Users); err != nil {
-						done <- err
-					}
+			}
 
-				case EventNewUser:
-					msg := fmt.Sprintf(
-						"[%s] <<user \"%s\" entered the room>>",
-						t.Time.Local(),
-						t.Name,
-					)
-					if err := f.addMessageLine(msg); err != nil {
-						done <- err
-					}
+			if err != nil {
+				logger.Error("read event error (sleep)",
+					map[string]any{
+						"error": err.Error(),
+					})
+				time.Sleep(time.Second)
+				continue
+			}
 
-				case EventNewMessage:
-					msg := fmt.Sprintf(
-						"[%s %s] >> %s",
-						t.Time.Local(),
-						t.Sender,
-						t.Message,
-					)
-					if err := f.addMessageLine(msg); err != nil {
-						done <- err
-					}
-
-				default:
-					logger.Warn("unhandled event type",
-						map[string]any{
-							"type": reflect.TypeOf(e).String(),
-						})
+			switch t := e.(type) {
+			case EventUserListUpdate:
+				if err := f.setUsers(t.Users); err != nil {
+					done <- err
 				}
+
+			case EventNewUser:
+				msg := fmt.Sprintf(
+					"[%s] <<user \"%s\" entered the room>>",
+					t.Time.Local(),
+					t.Name,
+				)
+				if err := f.addMessageLine(msg); err != nil {
+					done <- err
+				}
+
+			case EventNewMessage:
+				msg := fmt.Sprintf(
+					"[%s %s] >> %s",
+					t.Time.Local(),
+					t.Sender,
+					t.Message,
+				)
+				if err := f.addMessageLine(msg); err != nil {
+					done <- err
+				}
+
+			default:
+				logger.Warn("unhandled event type",
+					map[string]any{
+						"type": reflect.TypeOf(e).String(),
+					})
 			}
 		}
 	}()

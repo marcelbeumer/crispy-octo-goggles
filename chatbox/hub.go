@@ -2,7 +2,9 @@ package chatbox
 
 import (
 	"fmt"
+	"io"
 	"reflect"
+	"time"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 )
@@ -37,12 +39,10 @@ func (h *Hub) ConnectUser(
 }
 
 func (h *Hub) DisconnectUser(username string) error {
-	if conn, ok := h.connections.Get(username); ok {
-		select {
-		case <-conn.Closed():
-		default:
-			conn.Close()
-		}
+	conn, _ := h.connections.Get(username)
+	if conn != nil && !conn.Closed() {
+		conn.Close()
+
 	}
 	_ = h.connections.Remove(username)
 	return nil
@@ -56,22 +56,34 @@ func (h *Hub) pumpUser(username string) {
 	logger := h.logger
 	go func() {
 		for {
-			select {
-			case <-conn.Closed():
+			e, err := conn.ReadEvent()
+
+			if err == io.EOF {
+				logger.Info("read event EOF",
+					map[string]any{
+						"user": username,
+					})
 				h.DisconnectUser(username)
 				return
-			case e := <-conn.ReceiveEvent():
-				if e == nil {
+			}
 
-				}
-				if err := h.handleEvent(username, e); err != nil {
-					logger.Error(
-						"could not handle user event",
-						map[string]any{
-							"user":  username,
-							"error": err.Error(),
-						})
-				}
+			if err != nil {
+				logger.Error("read event error (sleep)",
+					map[string]any{
+						"user":  username,
+						"error": err.Error(),
+					})
+				time.Sleep(time.Second)
+				continue
+			}
+
+			if err := h.handleEvent(username, e); err != nil {
+				logger.Error(
+					"could not handle user event",
+					map[string]any{
+						"user":  username,
+						"error": err.Error(),
+					})
 			}
 		}
 	}()
@@ -92,6 +104,7 @@ func (h *Hub) handleEvent(username string, e Event) error {
 	default:
 		logger.Warn("unhandled event type",
 			map[string]any{
+				"user": username,
 				"type": reflect.TypeOf(e).String(),
 			})
 	}

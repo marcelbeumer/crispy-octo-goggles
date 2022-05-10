@@ -3,10 +3,10 @@ package chatbox
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
-	"sync"
 
 	ws "github.com/gorilla/websocket"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
@@ -89,14 +89,12 @@ func (m *WebsocketMessage) MarshalJSON() ([]byte, error) {
 }
 
 type WebsocketConnection struct {
-	logger    log.Logger
-	wsConn    *ws.Conn
-	fromOther chan Event
-	stopped   chan struct{}
-	closeOnce *sync.Once
+	logger     log.Logger
+	wsConn     *ws.Conn
+	eventOutCh chan Event
+	closed     chan struct{}
 }
 
-// SendEvent posts event. Non-blocking, shoot and forget
 func (c *WebsocketConnection) SendEvent(e Event) {
 	logger := c.logger
 	go func() {
@@ -135,22 +133,32 @@ func (c *WebsocketConnection) SendEvent(e Event) {
 	}()
 }
 
-// ReceiveEvent returns chan for Event
-func (c *WebsocketConnection) ReceiveEvent() <-chan Event {
-	return c.fromOther
+func (c *WebsocketConnection) ReadEvent() (Event, error) {
+	select {
+	case <-c.closed:
+		return nil, io.EOF
+	case e := <-c.eventOutCh:
+		return e, nil
+	}
 }
 
-// Disconnect disconnects from the server, if connected.
+func (c *WebsocketConnection) Closed() bool {
+	select {
+	case <-c.closed:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *WebsocketConnection) Close() error {
-	c.closeOnce.Do(func() {
-		close(c.stopped)
-	})
-	return c.wsConn.Close()
-}
-
-// Closed return chan that is closed when connection is closed
-func (c *WebsocketConnection) Closed() <-chan struct{} {
-	return c.stopped
+	select {
+	case <-c.closed:
+	default:
+		close(c.closed)
+		return c.wsConn.Close()
+	}
+	return nil
 }
 
 func (c *WebsocketConnection) wsReadPump() {
@@ -158,10 +166,12 @@ func (c *WebsocketConnection) wsReadPump() {
 	go func() {
 		for {
 			select {
-			case <-c.stopped:
+			case <-c.closed:
 				return
 			default:
 			}
+
+			// TODO look closely here and implement correct error handling
 
 			messageType, p, err := c.wsConn.ReadMessage()
 			if err != nil {
@@ -191,9 +201,9 @@ func (c *WebsocketConnection) wsReadPump() {
 					continue
 				}
 				select {
-				case <-c.stopped:
+				case <-c.closed:
 					return
-				case c.fromOther <- m.Data:
+				case c.eventOutCh <- m.Data:
 					//
 				}
 			default:
@@ -212,11 +222,10 @@ func NewWebsocketConnection(
 	logger log.Logger,
 ) *WebsocketConnection {
 	conn := WebsocketConnection{
-		logger:    logger,
-		wsConn:    wsConn,
-		fromOther: make(chan Event),
-		stopped:   make(chan struct{}),
-		closeOnce: &sync.Once{},
+		logger:     logger,
+		wsConn:     wsConn,
+		eventOutCh: make(chan Event),
+		closed:     make(chan struct{}),
 	}
 	conn.wsReadPump()
 	return &conn
@@ -292,7 +301,10 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	<-conn.Closed()
+	for !conn.Closed() {
+		//
+	}
+
 	logger.Info(
 		"end of websocket connection",
 		map[string]any{"remoteAddr": wsConn.RemoteAddr()},
