@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/chatbox"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 )
 
