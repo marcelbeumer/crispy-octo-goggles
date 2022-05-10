@@ -1,6 +1,10 @@
 # Chatbox
 
-TODO:
+## Usage
+
+`go run ./cmd --help`
+
+## TODO
 
 - Simplify Connection interface
 - Better serde of Events on websocket
