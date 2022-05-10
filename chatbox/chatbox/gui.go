@@ -12,10 +12,10 @@ import (
 )
 
 type GUIFrontend struct {
-	logger      log.Logger
-	conn        Connection
-	layoutReady chan struct{}
-	gui         *gocui.Gui
+	logger        log.Logger
+	conn          Connection
+	waitForLayout sync.WaitGroup
+	gui           *gocui.Gui
 }
 
 func (f *GUIFrontend) Start() error {
@@ -24,9 +24,9 @@ func (f *GUIFrontend) Start() error {
 
 	g.Mouse = true
 
-	f.layoutReady = make(chan struct{})
+	f.waitForLayout.Add(1)
 	g.SetManagerFunc(f.newManagerFunc(func() {
-		close(f.layoutReady)
+		f.waitForLayout.Done()
 	}))
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, f.quit); err != nil {
@@ -77,6 +77,7 @@ func (f *GUIFrontend) guiPump() <-chan error {
 }
 
 func (f *GUIFrontend) pumpEvents(stop <-chan struct{}) <-chan error {
+	f.waitForLayout.Wait()
 	logger := f.logger
 	done := make(chan error)
 	go func() {
@@ -133,7 +134,6 @@ func (f *GUIFrontend) pumpEvents(stop <-chan struct{}) <-chan error {
 }
 
 func (f *GUIFrontend) setUsers(usernames []string) error {
-	<-f.layoutReady
 	g := f.gui
 	v, err := g.View("users")
 	if err != nil {
@@ -150,7 +150,6 @@ func (f *GUIFrontend) setUsers(usernames []string) error {
 }
 
 func (f *GUIFrontend) addMessageLine(line string) error {
-	<-f.layoutReady
 	g := f.gui
 	v, err := g.View("messages")
 	if err != nil {
