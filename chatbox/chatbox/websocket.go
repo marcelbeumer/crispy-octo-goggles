@@ -71,7 +71,7 @@ func (m *WebsocketMessage) MarshalJSON() ([]byte, error) {
 		Name string `json:"name"`
 		Data any    `json:"data"`
 	}
-	o := JsonMessage{Name: "xxx", Data: m.Data}
+	o := JsonMessage{Data: m.Data}
 	switch m.Data.(type) {
 	case EventUserListUpdate:
 		o.Name = WEBSOCKET_EVENT_USER_LIST_UPDATE
