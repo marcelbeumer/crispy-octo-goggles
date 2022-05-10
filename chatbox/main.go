@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/chatbox"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/ui"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
@@ -69,14 +69,23 @@ func main() {
 			panic(err)
 		}
 	case "test":
-		c := ui.NewTestClient(logger)
-		c.Start()
-		ui, err := ui.NewUI(c, logger)
+		conn, err := chatbox.NewTestConnection("John", logger)
 		if err != nil {
 			panic(err)
 		}
-		if err := ui.Start(); err != nil {
+		fe := chatbox.NewStdoutFrontend(conn, logger)
+		if err := fe.Start(); err != nil {
 			panic(err)
 		}
+
+		// c := ui.NewTestClient(logger)
+		// c.Start()
+		// ui, err := ui.NewUI(c, logger)
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// if err := ui.Start(); err != nil {
+		// 	panic(err)
+		// }
 	}
 }

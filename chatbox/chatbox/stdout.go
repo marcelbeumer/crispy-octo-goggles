@@ -2,8 +2,10 @@ package chatbox
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
@@ -11,21 +13,15 @@ import (
 
 type StdoutFrontend struct {
 	logger log.Logger
-	client Client
 	conn   Connection
 }
 
-func (f *StdoutFrontend) Start(serverAddr string, username string) error {
-	conn, err := f.client.Connect(serverAddr, username)
-	if err != nil {
-		return err
-	}
-	f.conn = conn
-
+func (f *StdoutFrontend) Start() error {
 	defer f.conn.Close()
 	stop := make(chan struct{})
 	defer close(stop)
 
+	var err error
 	select {
 	case err = <-f.pumpNextEvent(stop):
 	case err = <-f.pumpStdin(stop):
@@ -69,6 +65,7 @@ func (f *StdoutFrontend) pumpStdin(stop <-chan struct{}) <-chan error {
 }
 
 func (f *StdoutFrontend) pumpNextEvent(stop <-chan struct{}) <-chan error {
+	logger := f.logger
 	done := make(chan error)
 	go func() {
 		defer close(done)
@@ -78,9 +75,14 @@ func (f *StdoutFrontend) pumpNextEvent(stop <-chan struct{}) <-chan error {
 				return
 			case e, ok := <-f.conn.ReceiveEvent():
 				if !ok || e == nil {
+					err := errors.New("connection closed event channel")
+					logger.Error(err.Error())
+					done <- err
 					return
 				}
 				switch t := e.(type) {
+				case EventUserListUpdate:
+					//
 				case EventNewUser:
 					fmt.Printf(
 						"[%s] <<user \"%s\" entered the room>>\n",
@@ -94,6 +96,11 @@ func (f *StdoutFrontend) pumpNextEvent(stop <-chan struct{}) <-chan error {
 						t.Sender,
 						t.Message,
 					)
+				default:
+					logger.Warn("unhandled event type",
+						map[string]any{
+							"type": reflect.TypeOf(e).String(),
+						})
 				}
 			}
 		}
@@ -101,9 +108,9 @@ func (f *StdoutFrontend) pumpNextEvent(stop <-chan struct{}) <-chan error {
 	return done
 }
 
-func NewStdoutClient(client Client, logger log.Logger) *StdoutFrontend {
+func NewStdoutFrontend(conn Connection, logger log.Logger) *StdoutFrontend {
 	return &StdoutFrontend{
 		logger: logger,
-		client: client,
+		conn:   conn,
 	}
 }

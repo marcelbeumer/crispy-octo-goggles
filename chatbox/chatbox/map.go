@@ -46,7 +46,7 @@ func (u *SafeMap[T]) Remove(key string) bool {
 	return ok
 }
 
-func NewMap[T any]() *SafeMap[T] {
+func NewSafeMap[T any]() *SafeMap[T] {
 	return &SafeMap[T]{
 		items: make(map[string]T),
 		l:     sync.RWMutex{},

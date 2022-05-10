@@ -2,6 +2,7 @@ package chatbox
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 )
@@ -40,12 +41,12 @@ func (h *Hub) ConnectUser(
 
 	h.pumpUser(&user)
 
-	h.sendEvent(username, &EventUserListUpdate{
+	h.sendEvent(username, EventUserListUpdate{
 		EventMeta: *NewEventMetaNow(),
 		Users:     h.users.Keys(),
 	})
 
-	h.broadcastEvent(&EventNewUser{
+	h.broadcastEvent(EventNewUser{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
 	}, username)
@@ -90,13 +91,22 @@ func (h *Hub) pumpUser(user *HubUser) {
 }
 
 func (h *Hub) handleEvent(username string, e Event) error {
+	logger := h.logger
 	switch t := e.(type) {
-	case *EventSendMessage:
-		h.broadcastEvent(&EventNewMessage{
+	case EventUserListUpdate:
+	case EventNewUser:
+	case EventSendMessage:
+		h.broadcastEvent(EventNewMessage{
 			EventMeta: *NewEventMetaNow(),
 			Sender:    username,
 			Message:   t.Message,
 		})
+	case EventNewMessage:
+	default:
+		logger.Warn("unhandled event type",
+			map[string]any{
+				"type": reflect.TypeOf(e).String(),
+			})
 	}
 	return nil
 }
@@ -130,5 +140,8 @@ func (h *Hub) sendEvent(username string, e Event) {
 }
 
 func NewHub(logger log.Logger) *Hub {
-	return &Hub{logger: logger}
+	return &Hub{
+		logger: logger,
+		users:  NewSafeMap[*HubUser](),
+	}
 }
