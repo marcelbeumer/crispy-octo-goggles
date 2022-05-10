@@ -47,10 +47,10 @@ func main() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		conn, err := chatbox.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
-		defer conn.Close()
 		if err != nil {
 			panic(err)
 		}
+		defer conn.Close()
 		// fe := chatbox.NewStdoutFrontend(conn, logger)
 		// if err := fe.Start(); err != nil {
 		// 	panic(err)
