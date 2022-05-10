@@ -75,16 +75,15 @@ func (f *GUIFrontend) Start() error {
 
 	stop := make(chan struct{})
 	defer close(stop)
+	defer g.Update(func(g *gocui.Gui) error {
+		return gocui.ErrQuit
+	})
 
 	select {
 	case err = <-f.guiPump():
 	case err = <-f.eventPump(layoutReady, stop):
 	}
 	return err
-}
-
-func (f *GUIFrontend) Close() {
-	f.gui.Close()
 }
 
 func (f *GUIFrontend) guiPump() <-chan error {
