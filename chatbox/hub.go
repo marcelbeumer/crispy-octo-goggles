@@ -7,32 +7,25 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 )
 
-type HubUser struct {
-	name string
-	conn Connection
-}
-
 type Hub struct {
-	logger log.Logger
-	users  *SafeMap[*HubUser]
+	logger      log.Logger
+	connections *SafeMap[Connection]
 }
 
 func (h *Hub) ConnectUser(
 	username string,
 	conn Connection,
 ) error {
-	if _, ok := h.users.Get(username); ok {
+	if _, ok := h.connections.Get(username); ok {
 		return fmt.Errorf("user \"%s\" already exists", username)
 	}
 
-	user := HubUser{name: username, conn: conn}
-	h.users.Set(username, &user)
-
-	h.pumpUser(&user)
+	h.connections.Set(username, conn)
+	h.pumpUser(username)
 
 	h.sendEvent(username, EventUserListUpdate{
 		EventMeta: *NewEventMetaNow(),
-		Users:     h.users.Keys(),
+		Users:     h.connections.Keys(),
 	})
 
 	h.broadcastEvent(EventNewUser{
@@ -44,34 +37,38 @@ func (h *Hub) ConnectUser(
 }
 
 func (h *Hub) DisconnectUser(username string) error {
-	if user, ok := h.users.Get(username); ok {
+	if conn, ok := h.connections.Get(username); ok {
 		select {
-		case <-user.conn.Closed():
+		case <-conn.Closed():
 		default:
-			user.conn.Close()
+			conn.Close()
 		}
 	}
-	_ = h.users.Remove(username)
+	_ = h.connections.Remove(username)
 	return nil
 }
 
-func (h *Hub) pumpUser(user *HubUser) {
+func (h *Hub) pumpUser(username string) {
+	conn, _ := h.connections.Get(username)
+	if conn == nil {
+		return
+	}
 	logger := h.logger
 	go func() {
 		for {
 			select {
-			case <-user.conn.Closed():
-				h.DisconnectUser(user.name)
+			case <-conn.Closed():
+				h.DisconnectUser(username)
 				return
-			case e := <-user.conn.ReceiveEvent():
+			case e := <-conn.ReceiveEvent():
 				if e == nil {
 
 				}
-				if err := h.handleEvent(user.name, e); err != nil {
+				if err := h.handleEvent(username, e); err != nil {
 					logger.Error(
 						"could not handle user event",
 						map[string]any{
-							"user":  user.name,
+							"user":  username,
 							"error": err.Error(),
 						})
 				}
@@ -106,16 +103,16 @@ func (h *Hub) broadcastEvent(e Event, exceptUsers ...string) {
 	for _, n := range exceptUsers {
 		except[n] = true
 	}
-	for _, user := range h.users.Values() {
-		if !except[user.name] {
-			go h.sendEvent(user.name, e)
+	for _, username := range h.connections.Keys() {
+		if !except[username] {
+			go h.sendEvent(username, e)
 		}
 	}
 }
 
 func (h *Hub) sendEvent(username string, e Event) {
 	logger := h.logger
-	user, ok := h.users.Get(username)
+	conn, ok := h.connections.Get(username)
 	if !ok {
 		logger.Error(
 			"can not send message to unknown user",
@@ -125,13 +122,13 @@ func (h *Hub) sendEvent(username string, e Event) {
 		return
 	}
 	go func() {
-		user.conn.SendEvent(e)
+		conn.SendEvent(e)
 	}()
 }
 
 func NewHub(logger log.Logger) *Hub {
 	return &Hub{
-		logger: logger,
-		users:  NewSafeMap[*HubUser](),
+		logger:      logger,
+		connections: NewSafeMap[Connection](),
 	}
 }
