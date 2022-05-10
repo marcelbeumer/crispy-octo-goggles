@@ -12,10 +12,9 @@ import (
 )
 
 type GUIFrontend struct {
-	logger        log.Logger
-	conn          Connection
-	waitForLayout sync.WaitGroup
-	gui           *gocui.Gui
+	logger log.Logger
+	conn   Connection
+	gui    *gocui.Gui
 }
 
 func (f *GUIFrontend) Start() error {
@@ -24,9 +23,9 @@ func (f *GUIFrontend) Start() error {
 
 	g.Mouse = true
 
-	f.waitForLayout.Add(1)
+	layoutReady := make(chan struct{})
 	g.SetManagerFunc(f.newManagerFunc(func() {
-		f.waitForLayout.Done()
+		close(layoutReady)
 	}))
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, f.quit); err != nil {
@@ -53,7 +52,7 @@ func (f *GUIFrontend) Start() error {
 	var err error
 	select {
 	case err = <-f.guiPump():
-	case err = <-f.pumpEvents(stop):
+	case err = <-f.pumpEvents(layoutReady, stop):
 	}
 	return err
 }
@@ -76,12 +75,19 @@ func (f *GUIFrontend) guiPump() <-chan error {
 	return done
 }
 
-func (f *GUIFrontend) pumpEvents(stop <-chan struct{}) <-chan error {
-	f.waitForLayout.Wait()
+func (f *GUIFrontend) pumpEvents(start <-chan struct{}, stop <-chan struct{}) <-chan error {
 	logger := f.logger
 	done := make(chan error)
+
 	go func() {
 		defer close(done)
+
+		select {
+		case <-stop:
+			return
+		case <-start:
+		}
+
 		for {
 			select {
 			case <-stop:
