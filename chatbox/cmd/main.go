@@ -1,11 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/alecthomas/kong"
+	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
 type ClientServerOpts struct {
@@ -46,16 +47,53 @@ func main() {
 	switch ctx.Command() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		c := websocket.NewClient(logger)
-		if err := c.Connect(addr, cli.Client.Username); err != nil {
+		conn, err := chatbox.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
+		if err != nil {
 			panic(err)
 		}
+		// fe := chatbox.NewStdoutFrontend(conn, logger)
+		// if err := fe.Start(); err != nil {
+		// 	panic(err)
+		// }
+		fe, err := chatbox.NewGUIFrontend(conn, logger)
+		if err != nil {
+			panic(err)
+		}
+		if err := fe.Start(); err != nil {
+			panic(err)
+		}
+
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		s := websocket.NewServer(logger)
+		s := chatbox.NewWebsocketServer(logger)
 		if err := s.Start(addr); err != nil {
 			panic(err)
 		}
+
 	case "test":
+		e := chatbox.EventNewMessage{
+			EventMeta: *chatbox.NewEventMetaNow(),
+			Sender:    "User",
+			Message:   "Hello",
+		}
+		m := chatbox.WebsocketMessage{
+			Name: chatbox.WEBSOCKET_EVENT_NEW_MESSAGE,
+			Data: e,
+		}
+
+		b, err := json.Marshal(&m)
+		if err != nil {
+			panic(err)
+		}
+
+		println("name", m.Name)
+		println("json", string(b))
+
+		var m2 chatbox.WebsocketMessage
+		if err := json.Unmarshal(b, &m2); err != nil {
+			panic(err)
+		}
+
+		// println(string(b))
 	}
 }

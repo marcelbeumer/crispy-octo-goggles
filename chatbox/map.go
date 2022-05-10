@@ -1,13 +1,13 @@
-package mutex
+package chatbox
 
 import "sync"
 
-type Map[T any] struct {
+type SafeMap[T any] struct {
 	items map[string]T
 	l     sync.RWMutex
 }
 
-func (u *Map[T]) Keys() []string {
+func (u *SafeMap[T]) Keys() []string {
 	keys := make([]string, 0, len(u.items))
 	for k := range u.items {
 		keys = append(keys, k)
@@ -15,7 +15,7 @@ func (u *Map[T]) Keys() []string {
 	return keys
 }
 
-func (u *Map[T]) Values() []T {
+func (u *SafeMap[T]) Values() []T {
 	values := make([]T, 0, len(u.items))
 	for _, v := range u.items {
 		values = append(values, v)
@@ -23,20 +23,20 @@ func (u *Map[T]) Values() []T {
 	return values
 }
 
-func (u *Map[T]) Get(key string) (T, bool) {
+func (u *SafeMap[T]) Get(key string) (T, bool) {
 	u.l.RLock()
 	i, ok := u.items[key]
 	u.l.RUnlock()
 	return i, ok
 }
 
-func (u *Map[T]) Set(key string, value T) {
+func (u *SafeMap[T]) Set(key string, value T) {
 	u.l.Lock()
 	u.items[key] = value
 	u.l.Unlock()
 }
 
-func (u *Map[T]) Remove(key string) bool {
+func (u *SafeMap[T]) Remove(key string) bool {
 	var ok bool
 	u.l.Lock()
 	if _, ok = u.items[key]; ok {
@@ -46,8 +46,8 @@ func (u *Map[T]) Remove(key string) bool {
 	return ok
 }
 
-func NewMap[T any]() *Map[T] {
-	return &Map[T]{
+func NewSafeMap[T any]() *SafeMap[T] {
+	return &SafeMap[T]{
 		items: make(map[string]T),
 		l:     sync.RWMutex{},
 	}

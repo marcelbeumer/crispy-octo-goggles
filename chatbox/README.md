@@ -1,12 +1,13 @@
 # Chatbox
 
-TODO:
+## Usage
 
-- Simple CLI UI for client:
-  - Left panel: messages
-  - Right panel: user list
-  - Bottom panel: message input
+`go run ./cmd --help`
+
+## TODO
+
+- Simplify Connection interface
+- Better serde of Events on websocket
+- Properly handle buffering/backpressure
+- Prevent logging messing up GUIFrontend rendering
 - Unit tests
-- GetData/NewMessage etc is a bit complicated, how would it be more simple and more "go"?
-  - Start without generics maybe, explicit factory functions?
-  - Different way of modelling messages? For ex: specific types for specific message types, interface to capture all (`type Message interface`)
