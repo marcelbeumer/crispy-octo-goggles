@@ -6,7 +6,6 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/chatbox"
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/websocket"
 )
 
 type ClientServerOpts struct {
@@ -47,11 +46,23 @@ func main() {
 	switch ctx.Command() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		c := websocket.NewClient(logger)
-		// go func() {
-		if err := c.Connect(addr, cli.Client.Username); err != nil {
+		conn, err := chatbox.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
+		if err != nil {
 			panic(err)
 		}
+		fe, err := chatbox.NewGUIFrontend(conn, logger)
+		if err != nil {
+			panic(err)
+		}
+		if err := fe.Start(); err != nil {
+			panic(err)
+		}
+
+		// c := websocket.NewClient(logger)
+		// // go func() {
+		// if err := c.Connect(addr, cli.Client.Username); err != nil {
+		// 	panic(err)
+		// }
 		// }()
 		// time.Sleep(5)
 		// ui, err := ui.NewUI(c, logger)
@@ -64,7 +75,7 @@ func main() {
 
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		s := websocket.NewServer(logger)
+		s := chatbox.NewWebsocketServer(logger)
 		if err := s.Start(addr); err != nil {
 			panic(err)
 		}
