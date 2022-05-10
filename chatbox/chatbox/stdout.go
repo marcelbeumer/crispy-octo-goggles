@@ -2,7 +2,6 @@ package chatbox
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -72,13 +71,9 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan error {
 			select {
 			case <-stop:
 				return
-			case e, ok := <-f.conn.ReceiveEvent():
-				if !ok || e == nil {
-					err := errors.New("connection closed event channel")
-					logger.Error(err.Error())
-					done <- err
-					return
-				}
+			case <-f.conn.Closed():
+				return
+			case e := <-f.conn.ReceiveEvent():
 				switch t := e.(type) {
 				case EventUserListUpdate:
 					//

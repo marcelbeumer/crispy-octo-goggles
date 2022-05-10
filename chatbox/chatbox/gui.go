@@ -1,7 +1,6 @@
 package chatbox
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -92,13 +91,9 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 			select {
 			case <-stop:
 				return
-			case e, ok := <-f.conn.ReceiveEvent():
-				if !ok || e == nil {
-					err := errors.New("connection closed event channel")
-					logger.Error(err.Error())
-					done <- err
-					return
-				}
+			case <-f.conn.Closed():
+				return
+			case e := <-f.conn.ReceiveEvent():
 				switch t := e.(type) {
 				case EventUserListUpdate:
 					if err := f.setUsers(t.Users); err != nil {

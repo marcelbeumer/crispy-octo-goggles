@@ -8,11 +8,8 @@ import (
 )
 
 type HubUser struct {
-	name       string
-	toUser     chan<- Event
-	toHub      <-chan Event
-	disconnect chan bool
-	done       chan struct{}
+	name string
+	conn Connection
 }
 
 type Hub struct {
@@ -22,21 +19,13 @@ type Hub struct {
 
 func (h *Hub) ConnectUser(
 	username string,
-	toUser chan<- Event,
-	toHub <-chan Event,
+	conn Connection,
 ) error {
 	if _, ok := h.users.Get(username); ok {
 		return fmt.Errorf("user \"%s\" already exists", username)
 	}
 
-	user := HubUser{
-		name:       username,
-		toUser:     toUser,
-		toHub:      toHub,
-		disconnect: make(chan bool),
-		done:       make(chan struct{}),
-	}
-
+	user := HubUser{name: username, conn: conn}
 	h.users.Set(username, &user)
 
 	h.pumpUser(&user)
@@ -56,7 +45,11 @@ func (h *Hub) ConnectUser(
 
 func (h *Hub) DisconnectUser(username string) error {
 	if user, ok := h.users.Get(username); ok {
-		user.disconnect <- true
+		select {
+		case <-user.conn.Closed():
+		default:
+			user.conn.Close()
+		}
 	}
 	_ = h.users.Remove(username)
 	return nil
@@ -65,18 +58,15 @@ func (h *Hub) DisconnectUser(username string) error {
 func (h *Hub) pumpUser(user *HubUser) {
 	logger := h.logger
 	go func() {
-		select {
-		case <-user.done:
-		case <-user.disconnect:
-			close(user.done)
-		}
-	}()
-	go func() {
 		for {
 			select {
-			case <-user.done:
+			case <-user.conn.Closed():
+				h.DisconnectUser(user.name)
 				return
-			case e := <-user.toHub:
+			case e := <-user.conn.ReceiveEvent():
+				if e == nil {
+
+				}
 				if err := h.handleEvent(user.name, e); err != nil {
 					logger.Error(
 						"could not handle user event",
@@ -135,7 +125,7 @@ func (h *Hub) sendEvent(username string, e Event) {
 		return
 	}
 	go func() {
-		user.toUser <- e
+		user.conn.SendEvent(e)
 	}()
 }
 

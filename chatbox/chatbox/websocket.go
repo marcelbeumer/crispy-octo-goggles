@@ -92,7 +92,7 @@ type WebsocketConnection struct {
 	logger    log.Logger
 	wsConn    *ws.Conn
 	fromOther chan Event
-	stop      chan struct{}
+	stopped   chan struct{}
 	closeOnce *sync.Once
 }
 
@@ -143,9 +143,14 @@ func (c *WebsocketConnection) ReceiveEvent() <-chan Event {
 // Disconnect disconnects from the server, if connected.
 func (c *WebsocketConnection) Close() error {
 	c.closeOnce.Do(func() {
-		close(c.stop)
+		close(c.stopped)
 	})
 	return c.wsConn.Close()
+}
+
+// Closed return chan that is closed when connection is closed
+func (c *WebsocketConnection) Closed() <-chan struct{} {
+	return c.stopped
 }
 
 func (c *WebsocketConnection) wsReadPump() {
@@ -153,17 +158,18 @@ func (c *WebsocketConnection) wsReadPump() {
 	go func() {
 		for {
 			select {
-			case <-c.stop:
+			case <-c.stopped:
 				return
 			default:
 			}
 
 			messageType, p, err := c.wsConn.ReadMessage()
 			if err != nil {
-				logger.Info(
+				logger.Error(
 					"websocket read error",
 					map[string]any{"error": err},
 				)
+				c.Close()
 				return
 			}
 			logger.Debug(
@@ -185,7 +191,7 @@ func (c *WebsocketConnection) wsReadPump() {
 					continue
 				}
 				select {
-				case <-c.stop:
+				case <-c.stopped:
 					return
 				case c.fromOther <- m.Data:
 					//
@@ -209,7 +215,7 @@ func NewWebsocketConnection(
 		logger:    logger,
 		wsConn:    wsConn,
 		fromOther: make(chan Event),
-		stop:      make(chan struct{}),
+		stopped:   make(chan struct{}),
 		closeOnce: &sync.Once{},
 	}
 	conn.wsReadPump()
@@ -270,20 +276,15 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer wsConn.Close()
 	logger.Info(
 		"new websocket connection",
 		map[string]any{"remoteAddr": wsConn.RemoteAddr()},
 	)
 
 	conn := NewWebsocketConnection(wsConn, logger)
+	defer conn.Close()
 
-	toUser := make(chan Event)
-	toHub := make(chan Event)
-
-	// XXX maybe remove toUser/toHub API and just pass connection?
-
-	if err := s.hub.ConnectUser(username, toUser, toHub); err != nil {
+	if err := s.hub.ConnectUser(username, conn); err != nil {
 		logger.Error(
 			"could not connect to room",
 			map[string]any{"remoteAddr": wsConn.RemoteAddr()},
@@ -291,14 +292,11 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for {
-		select {
-		case e := <-toUser:
-			conn.SendEvent(e)
-		case e := <-conn.ReceiveEvent():
-			toHub <- e
-		}
-	}
+	<-conn.Closed()
+	logger.Info(
+		"end of websocket connection",
+		map[string]any{"remoteAddr": wsConn.RemoteAddr()},
+	)
 }
 
 func NewWebsocketClientConnection(
