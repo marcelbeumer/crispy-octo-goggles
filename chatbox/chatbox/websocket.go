@@ -26,14 +26,16 @@ type WebsocketMessage struct {
 
 func (m *WebsocketMessage) UnmarshalJSON(data []byte) error {
 	type JsonMessage struct {
-		Name string
-		Data json.RawMessage
+		Name string          `json:"name"`
+		Data json.RawMessage `json:"data"`
 	}
 	result := JsonMessage{Data: json.RawMessage{}}
 	if err := json.Unmarshal(data, &result); err != nil {
 		return err
 	}
-	switch m.Name {
+	m.Name = result.Name
+
+	switch result.Name {
 	case WEBSOCKET_EVENT_USER_LIST_UPDATE:
 		var d EventUserListUpdate
 		if err := json.Unmarshal(result.Data, &d); err != nil {
@@ -58,27 +60,32 @@ func (m *WebsocketMessage) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		m.Data = d
+	default:
+		return fmt.Errorf("could not unmarshal websocket message with name %s", m.Name)
 	}
 	return nil
 }
 
 func (m *WebsocketMessage) MarshalJSON() ([]byte, error) {
 	type JsonMessage struct {
-		Name string
-		Data any
+		Name string `json:"name"`
+		Data any    `json:"data"`
 	}
-	o := JsonMessage{Data: json.RawMessage{}}
+	o := JsonMessage{Name: "xxx", Data: m.Data}
 	switch m.Data.(type) {
 	case EventUserListUpdate:
 		o.Name = WEBSOCKET_EVENT_USER_LIST_UPDATE
 	case EventNewUser:
 		o.Name = WEBSOCKET_EVENT_NEW_USER
-	case EventSendMessage:
-		o.Name = WEBSOCKET_EVENT_NEW_MESSAGE
 	case EventNewMessage:
+		o.Name = WEBSOCKET_EVENT_NEW_MESSAGE
+	case EventSendMessage:
 		o.Name = WEBSOCKET_EVENT_SEND_MESSAGE
+	default:
+		return nil, fmt.Errorf("could not marshal websocket message with name %s", m.Name)
 	}
-	return json.Marshal(o)
+	b, err := json.Marshal(o)
+	return b, err
 }
 
 type WebsocketConnection struct {
@@ -93,7 +100,7 @@ type WebsocketConnection struct {
 func (c *WebsocketConnection) SendEvent(e Event) {
 	logger := c.logger
 	go func() {
-		m := WebsocketMessage{Name: "", Data: e}
+		m := WebsocketMessage{Data: e}
 		switch t := e.(type) {
 		case EventUserListUpdate:
 			m.Name = WEBSOCKET_EVENT_USER_LIST_UPDATE
@@ -110,7 +117,7 @@ func (c *WebsocketConnection) SendEvent(e Event) {
 			)
 			return
 		}
-		jsonText, err := json.Marshal(m)
+		jsonText, err := json.Marshal(&m)
 		if err != nil {
 			logger.Error(
 				"could marshal event to json",
@@ -159,12 +166,12 @@ func (c *WebsocketConnection) wsReadPump() {
 				)
 				return
 			}
+			logger.Debug(
+				"websocket received message",
+				map[string]any{"value": string(p)},
+			)
 			switch messageType {
 			case ws.TextMessage:
-				logger.Debug(
-					"websocket received message",
-					map[string]any{"value": string(p)},
-				)
 				var m WebsocketMessage
 				if err := json.Unmarshal(p, &m); err != nil {
 					logger.Info(
@@ -173,10 +180,14 @@ func (c *WebsocketConnection) wsReadPump() {
 					)
 					continue
 				}
+				if m.Data == nil {
+					logger.Warn("data was nil after parsing message")
+					continue
+				}
 				select {
 				case <-c.stop:
 					return
-				case c.fromOther <- m:
+				case c.fromOther <- m.Data:
 					//
 				}
 			default:

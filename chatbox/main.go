@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/alecthomas/kong"
@@ -50,6 +51,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		// fe := chatbox.NewStdoutFrontend(conn, logger)
+		// if err := fe.Start(); err != nil {
+		// 	panic(err)
+		// }
 		fe, err := chatbox.NewGUIFrontend(conn, logger)
 		if err != nil {
 			panic(err)
@@ -57,21 +62,6 @@ func main() {
 		if err := fe.Start(); err != nil {
 			panic(err)
 		}
-
-		// c := websocket.NewClient(logger)
-		// // go func() {
-		// if err := c.Connect(addr, cli.Client.Username); err != nil {
-		// 	panic(err)
-		// }
-		// }()
-		// time.Sleep(5)
-		// ui, err := ui.NewUI(c, logger)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// if err := ui.Start(); err != nil {
-		// 	panic(err)
-		// }
 
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
@@ -79,27 +69,31 @@ func main() {
 		if err := s.Start(addr); err != nil {
 			panic(err)
 		}
+
 	case "test":
-		conn, err := chatbox.NewTestConnection("John", logger)
-		if err != nil {
-			panic(err)
+		e := chatbox.EventNewMessage{
+			EventMeta: *chatbox.NewEventMetaNow(),
+			Sender:    "User",
+			Message:   "Hello",
 		}
-		fe, err := chatbox.NewGUIFrontend(conn, logger)
-		if err != nil {
-			panic(err)
+		m := chatbox.WebsocketMessage{
+			Name: chatbox.WEBSOCKET_EVENT_NEW_MESSAGE,
+			Data: e,
 		}
-		if err := fe.Start(); err != nil {
+
+		b, err := json.Marshal(&m)
+		if err != nil {
 			panic(err)
 		}
 
-		// c := ui.NewTestClient(logger)
-		// c.Start()
-		// ui, err := ui.NewUI(c, logger)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// if err := ui.Start(); err != nil {
-		// 	panic(err)
-		// }
+		println("name", m.Name)
+		println("json", string(b))
+
+		var m2 chatbox.WebsocketMessage
+		if err := json.Unmarshal(b, &m2); err != nil {
+			panic(err)
+		}
+
+		// println(string(b))
 	}
 }
