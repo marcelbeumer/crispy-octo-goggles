@@ -17,13 +17,12 @@ type StdoutFrontend struct {
 }
 
 func (f *StdoutFrontend) Start() error {
-	defer f.conn.Close()
 	stop := make(chan struct{})
 	defer close(stop)
 
 	var err error
 	select {
-	case err = <-f.pumpNextEvent(stop):
+	case err = <-f.pumpEvents(stop):
 	case err = <-f.pumpStdin(stop):
 	}
 	return err
@@ -64,7 +63,7 @@ func (f *StdoutFrontend) pumpStdin(stop <-chan struct{}) <-chan error {
 	return done
 }
 
-func (f *StdoutFrontend) pumpNextEvent(stop <-chan struct{}) <-chan error {
+func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan error {
 	logger := f.logger
 	done := make(chan error)
 	go func() {

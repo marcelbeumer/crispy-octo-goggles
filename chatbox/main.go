@@ -73,7 +73,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fe := chatbox.NewStdoutFrontend(conn, logger)
+		fe, err := chatbox.NewGUIFrontend(conn, logger)
+		if err != nil {
+			panic(err)
+		}
 		if err := fe.Start(); err != nil {
 			panic(err)
 		}
