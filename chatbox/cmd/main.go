@@ -14,22 +14,22 @@ type ClientServerOpts struct {
 }
 
 type ClientOpts struct {
-	Username string `help:"Username." required:"" short:"u"`
+	Username       string `help:"Username."                   required:"" short:"u"`
+	StdoutFrontend bool   `help:"Use simple stdout frontend."             short:"s"`
 }
 
 type Commands struct {
 	Verbose     bool `help:"Verbose (logging info)"       short:"v"`
 	VeryVerbose bool `help:"Very verbose (logging debug)" short:"V"`
-
-	Client struct {
+	Client      struct {
 		ClientServerOpts
 		ClientOpts
-	} `help:"Start client"               cmd:"client"`
+	} `help:"Start client"                           cmd:"client"`
 	Server struct {
 		ClientServerOpts
-	} `help:"Start server"               cmd:"client"`
+	} `help:"Start server"                           cmd:"client"`
 	Test struct {
-	} `help:"Run non-http test scenario" cmd:"test"`
+	} `help:"Run non-http test scenario"             cmd:"test"`
 }
 
 func main() {
@@ -44,23 +44,30 @@ func main() {
 	log.SetStandardLogger(logger)
 
 	switch ctx.Command() {
+
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
+
 		conn, err := chatbox.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
 		if err != nil {
 			panic(err)
 		}
+
 		defer conn.Close()
-		// fe := chatbox.NewStdoutFrontend(conn, logger)
-		// if err := fe.Start(); err != nil {
-		// 	panic(err)
-		// }
-		fe, err := chatbox.NewGUIFrontend(conn, logger)
-		if err != nil {
-			panic(err)
-		}
-		if err := fe.Start(); err != nil {
-			panic(err)
+
+		if cli.Client.StdoutFrontend {
+			fe := chatbox.NewStdoutFrontend(conn, logger)
+			if err := fe.Start(); err != nil {
+				panic(err)
+			}
+		} else {
+			fe, err := chatbox.NewGUIFrontend(conn, logger)
+			if err != nil {
+				panic(err)
+			}
+			if err := fe.Start(); err != nil {
+				panic(err)
+			}
 		}
 
 	case "server":
@@ -71,19 +78,5 @@ func main() {
 		}
 
 	case "test":
-		hub := chatbox.NewHub(logger)
-		toHubCh := make(chan chatbox.Event)
-		toUserCh := make(chan chatbox.Event)
-		hubConn := chatbox.NewTestConnection(toHubCh, toUserCh)
-		userConn := chatbox.NewTestConnection(toUserCh, toHubCh)
-		defer hubConn.Close()
-		defer userConn.Close()
-		if err := hub.ConnectUser("User", hubConn); err != nil {
-			panic(err)
-		}
-		fe := chatbox.NewStdoutFrontend(userConn, logger)
-		if err := fe.Start(); err != nil {
-			panic(err)
-		}
 	}
 }

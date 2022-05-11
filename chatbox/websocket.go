@@ -12,80 +12,41 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
 )
 
-const (
-	WEBSOCKET_EVENT_USER_LIST_UPDATE = "userListUpdate"
-	WEBSOCKET_EVENT_NEW_USER         = "newUser"
-	WEBSOCKET_EVENT_SEND_MESSAGE     = "sendMessage"
-	WEBSOCKET_EVENT_NEW_MESSAGE      = "newMessage"
-)
-
-type WebsocketMessage struct {
-	Name string
-	Data Event
+var websocketHandlers = map[string]func() Event{
+	"userListUpdate": func() Event { return &EventUserListUpdate{} },
+	"newUser":        func() Event { return &EventNewUser{} },
+	"sendMessage":    func() Event { return &EventSendMessage{} },
+	"newMessage":     func() Event { return &EventNewMessage{} },
 }
 
-func (m *WebsocketMessage) UnmarshalJSON(data []byte) error {
-	type JsonMessage struct {
-		Name string          `json:"name"`
-		Data json.RawMessage `json:"data"`
-	}
-	result := JsonMessage{Data: json.RawMessage{}}
-	if err := json.Unmarshal(data, &result); err != nil {
+type websocketMessage struct {
+	Name string `json:"name"`
+	Data Event  `json:"data"`
+}
+
+type websocketMessageRaw struct {
+	Name string           `json:"name"`
+	Data *json.RawMessage `json:"data"`
+}
+
+func (m *websocketMessage) UnmarshalJSON(data []byte) error {
+	envelope := websocketMessageRaw{Data: &json.RawMessage{}}
+	if err := json.Unmarshal(data, &envelope); err != nil {
 		return err
 	}
-	m.Name = result.Name
 
-	switch result.Name {
-	case WEBSOCKET_EVENT_USER_LIST_UPDATE:
-		var d EventUserListUpdate
-		if err := json.Unmarshal(result.Data, &d); err != nil {
-			return err
-		}
-		m.Data = d
-	case WEBSOCKET_EVENT_NEW_USER:
-		var d EventNewUser
-		if err := json.Unmarshal(result.Data, &d); err != nil {
-			return err
-		}
-		m.Data = d
-	case WEBSOCKET_EVENT_SEND_MESSAGE:
-		var d EventSendMessage
-		if err := json.Unmarshal(result.Data, &d); err != nil {
-			return err
-		}
-		m.Data = d
-	case WEBSOCKET_EVENT_NEW_MESSAGE:
-		var d EventNewMessage
-		if err := json.Unmarshal(result.Data, &d); err != nil {
-			return err
-		}
-		m.Data = d
-	default:
-		return fmt.Errorf("could not unmarshal websocket message with name %s", m.Name)
+	handler := websocketHandlers[envelope.Name]
+	if handler == nil {
+		return fmt.Errorf("unknown event name \"%s\"", envelope.Name)
 	}
+	eventData := handler()
+	if err := json.Unmarshal(*envelope.Data, &eventData); err != nil {
+		return err
+	}
+
+	m.Name = envelope.Name
+	m.Data = eventData
 	return nil
-}
-
-func (m *WebsocketMessage) MarshalJSON() ([]byte, error) {
-	type JsonMessage struct {
-		Name string `json:"name"`
-		Data any    `json:"data"`
-	}
-	o := JsonMessage{Data: m.Data}
-	switch m.Data.(type) {
-	case EventUserListUpdate:
-		o.Name = WEBSOCKET_EVENT_USER_LIST_UPDATE
-	case EventNewUser:
-		o.Name = WEBSOCKET_EVENT_NEW_USER
-	case EventNewMessage:
-		o.Name = WEBSOCKET_EVENT_NEW_MESSAGE
-	case EventSendMessage:
-		o.Name = WEBSOCKET_EVENT_SEND_MESSAGE
-	default:
-		return nil, fmt.Errorf("could not marshal websocket message with name %s", m.Name)
-	}
-	b, err := json.Marshal(o)
-	return b, err
 }
 
 type WebsocketConnection struct {
@@ -98,23 +59,24 @@ type WebsocketConnection struct {
 func (c *WebsocketConnection) SendEvent(e Event) {
 	logger := c.logger
 	go func() {
-		m := WebsocketMessage{Data: e}
-		switch t := e.(type) {
-		case EventUserListUpdate:
-			m.Name = WEBSOCKET_EVENT_USER_LIST_UPDATE
-		case EventNewUser:
-			m.Name = WEBSOCKET_EVENT_NEW_USER
-		case EventSendMessage:
-			m.Name = WEBSOCKET_EVENT_NEW_MESSAGE
-		case EventNewMessage:
-			m.Name = WEBSOCKET_EVENT_SEND_MESSAGE
-		default:
+		m := websocketMessage{Data: e}
+		eType := reflect.TypeOf(e)
+
+		for name, handler := range websocketHandlers {
+			if reflect.TypeOf(handler()) == eType {
+				m.Name = name
+				break
+			}
+		}
+
+		if m.Name == "" {
 			logger.Error(
 				"can not send message type over websocket",
-				map[string]any{"type": reflect.TypeOf(t).String()},
+				map[string]any{"type": eType.String()},
 			)
 			return
 		}
+
 		jsonText, err := json.Marshal(&m)
 		if err != nil {
 			logger.Error(
@@ -122,6 +84,7 @@ func (c *WebsocketConnection) SendEvent(e Event) {
 				map[string]any{"error": err},
 			)
 		}
+
 		err = c.wsConn.WriteMessage(ws.TextMessage, jsonText)
 		if err != nil {
 			logger.Info(
@@ -165,14 +128,11 @@ func (c *WebsocketConnection) wsReadPump() {
 	logger := c.logger
 	go func() {
 		for {
-			select {
-			case <-c.closed:
+			if c.Closed() {
 				return
-			default:
 			}
 
 			// TODO look closely here and implement correct error handling
-
 			messageType, p, err := c.wsConn.ReadMessage()
 			if err != nil {
 				logger.Error(
@@ -182,13 +142,16 @@ func (c *WebsocketConnection) wsReadPump() {
 				c.Close()
 				return
 			}
+
 			logger.Debug(
 				"websocket received message",
 				map[string]any{"value": string(p)},
 			)
+
 			switch messageType {
+
 			case ws.TextMessage:
-				var m WebsocketMessage
+				var m websocketMessage
 				if err := json.Unmarshal(p, &m); err != nil {
 					logger.Info(
 						"could not parse message",
@@ -200,12 +163,17 @@ func (c *WebsocketConnection) wsReadPump() {
 					logger.Warn("data was nil after parsing message")
 					continue
 				}
+				logger.Info(
+					"sending web socket message data",
+					map[string]any{"name": m.Name},
+				)
 				select {
 				case <-c.closed:
 					return
 				case c.eventOutCh <- m.Data:
 					//
 				}
+
 			default:
 				logger.Info(
 					"websocket ignoring message type: %d",
@@ -250,10 +218,7 @@ func NewWebsocketServer(logger log.Logger) *WebsocketServer {
 
 func (s *WebsocketServer) Start(addr string) error {
 	logger := s.logger
-	logger.Info(
-		"starting server",
-		map[string]any{"addr": addr},
-	)
+	logger.Info("starting server", map[string]any{"addr": addr})
 	err := http.ListenAndServe(addr, http.HandlerFunc(s.handleHttp))
 	return err
 }
@@ -261,10 +226,7 @@ func (s *WebsocketServer) Start(addr string) error {
 func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger
 
-	logger.Info(
-		"http request",
-		map[string]any{"remoteAddr": r.RemoteAddr},
-	)
+	logger.Info("http request", map[string]any{"remoteAddr": r.RemoteAddr})
 
 	username := r.URL.Query().Get("username")
 	if username == "" {

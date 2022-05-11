@@ -132,25 +132,25 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 			}
 
 			switch t := e.(type) {
-			case EventUserListUpdate:
+			case *EventUserListUpdate:
 				if err := f.setUsers(t.Users); err != nil {
 					done <- err
 				}
 
-			case EventNewUser:
+			case *EventNewUser:
 				msg := fmt.Sprintf(
 					"[%s] <<user \"%s\" entered the room>>",
-					t.Time.Local(),
+					t.time.Local(),
 					t.Name,
 				)
 				if err := f.addMessageLine(msg); err != nil {
 					done <- err
 				}
 
-			case EventNewMessage:
+			case *EventNewMessage:
 				msg := fmt.Sprintf(
 					"[%s %s] >> %s",
-					t.Time.Local(),
+					t.time.Local(),
 					t.Sender,
 					t.Message,
 				)
@@ -287,7 +287,7 @@ func (f *GUIFrontend) sendMessageFromInput(g *gocui.Gui, v *gocui.View) error {
 	if err != nil {
 		return err
 	}
-	f.conn.SendEvent(EventSendMessage{
+	f.conn.SendEvent(&EventSendMessage{
 		EventMeta: *NewEventMetaNow(),
 		Message:   string(bytes),
 	})
