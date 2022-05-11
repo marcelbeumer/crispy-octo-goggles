@@ -30,22 +30,23 @@ type websocketMessageRaw struct {
 }
 
 func (m *websocketMessage) UnmarshalJSON(data []byte) error {
-	envelope := websocketMessageRaw{Data: &json.RawMessage{}}
-	if err := json.Unmarshal(data, &envelope); err != nil {
+	raw := websocketMessageRaw{Data: &json.RawMessage{}}
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	handler := websocketHandlers[envelope.Name]
+	handler := websocketHandlers[raw.Name]
 	if handler == nil {
-		return fmt.Errorf("unknown event name \"%s\"", envelope.Name)
+		return fmt.Errorf("unknown event name \"%s\"", raw.Name)
 	}
-	eventData := handler()
-	if err := json.Unmarshal(*envelope.Data, &eventData); err != nil {
+
+	m.Name = raw.Name
+	m.Data = handler()
+
+	if err := json.Unmarshal(*raw.Data, &m.Data); err != nil {
 		return err
 	}
 
-	m.Name = envelope.Name
-	m.Data = eventData
 	return nil
 }
 
@@ -278,11 +279,18 @@ func NewWebsocketClientConnection(
 	username string,
 	logger log.Logger,
 ) (*WebsocketConnection, error) {
-	q := url.Values{}
-	q.Add("username", username)
-	u := url.URL{Scheme: "ws", Host: serverAddr, Path: "/", RawQuery: q.Encode()}
+	q := url.Values{"username": []string{username}}
+	u := url.URL{
+		Scheme:   "ws",
+		Host:     serverAddr,
+		Path:     "/",
+		RawQuery: q.Encode(),
+	}
 	serverUrl := u.String()
-	fmt.Println("connecting to", serverUrl)
+	logger.Info(
+		"connecting to server",
+		map[string]any{"serverUrl": serverUrl},
+	)
 	wsConn, _, err := ws.DefaultDialer.Dial(serverUrl, nil)
 	if err != nil {
 		return nil, err
