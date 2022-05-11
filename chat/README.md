@@ -9,3 +9,4 @@
 - Properly handle buffering/backpressure
 - Streamline logging (messy now; also consider other API; see what others do)
 - Unit tests
+- Production setup: Dockerfile, client install/usage instructions
