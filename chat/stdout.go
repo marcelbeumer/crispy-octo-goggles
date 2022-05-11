@@ -1,4 +1,4 @@
-package chatbox
+package chat
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type StdoutFrontend struct {

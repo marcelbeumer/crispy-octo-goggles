@@ -1,4 +1,4 @@
-module github.com/marcelbeumer/crispy-octo-goggles/chatbox
+module github.com/marcelbeumer/crispy-octo-goggles/chat
 
 go 1.18
 

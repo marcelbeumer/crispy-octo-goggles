@@ -1,4 +1,4 @@
-package chatbox
+package chat
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"reflect"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 var websocketHandlers = map[string]func() Event{

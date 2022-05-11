@@ -1,4 +1,4 @@
-package chatbox
+package chat
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/awesome-gocui/gocui"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type GUIFrontend struct {

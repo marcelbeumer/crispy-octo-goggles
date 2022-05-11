@@ -1,4 +1,4 @@
-# Chatbox
+# Chat
 
 ## Usage
 

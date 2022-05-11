@@ -1,4 +1,4 @@
-package chatbox
+package chat
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type Hub struct {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox"
-	"github.com/marcelbeumer/crispy-octo-goggles/chatbox/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type ClientServerOpts struct {
@@ -36,7 +36,7 @@ func main() {
 	cli := Commands{}
 	ctx := kong.Parse(
 		&cli,
-		kong.Name("chatbox"),
+		kong.Name("chat"),
 		kong.UsageOnError(),
 	)
 
@@ -48,7 +48,7 @@ func main() {
 	case "client":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
-		conn, err := chatbox.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
+		conn, err := chat.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
 		if err != nil {
 			panic(err)
 		}
@@ -56,12 +56,12 @@ func main() {
 		defer conn.Close()
 
 		if cli.Client.StdoutFrontend {
-			fe := chatbox.NewStdoutFrontend(conn, logger)
+			fe := chat.NewStdoutFrontend(conn, logger)
 			if err := fe.Start(); err != nil {
 				panic(err)
 			}
 		} else {
-			fe, err := chatbox.NewGUIFrontend(conn, logger)
+			fe, err := chat.NewGUIFrontend(conn, logger)
 			if err != nil {
 				panic(err)
 			}
@@ -72,7 +72,7 @@ func main() {
 
 	case "server":
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		s := chatbox.NewWebsocketServer(logger)
+		s := chat.NewWebsocketServer(logger)
 		if err := s.Start(addr); err != nil {
 			panic(err)
 		}
