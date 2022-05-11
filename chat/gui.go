@@ -140,7 +140,7 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 			case *EventNewUser:
 				msg := fmt.Sprintf(
 					"[%s] <<user \"%s\" entered the room>>",
-					t.time.Local(),
+					t.Time.Local(),
 					t.Name,
 				)
 				if err := f.addMessageLine(msg); err != nil {
@@ -150,7 +150,7 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 			case *EventNewMessage:
 				msg := fmt.Sprintf(
 					"[%s %s] >> %s",
-					t.time.Local(),
+					t.Time.Local(),
 					t.Sender,
 					t.Message,
 				)

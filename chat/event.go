@@ -10,36 +10,36 @@ type Event interface {
 }
 
 type EventMeta struct {
-	time time.Time
+	Time time.Time `json:"time"`
 }
 
 func (e *EventMeta) When() time.Time {
-	return e.time
+	return e.Time
 }
 
 type EventUserListUpdate struct {
 	EventMeta
-	Users []string
+	Users []string `json:"users"`
 }
 
 type EventNewUser struct {
 	EventMeta
-	Name string
+	Name string `json:"name"`
 }
 
 type EventSendMessage struct {
 	EventMeta
-	Message string
+	Message string `json:"message"`
 }
 
 type EventNewMessage struct {
 	EventMeta
-	Sender  string
-	Message string
+	Sender  string `json:"sender"`
+	Message string `json:"message"`
 }
 
 func NewEventMetaNow() *EventMeta {
 	return &EventMeta{
-		time: time.Now(),
+		Time: time.Now(),
 	}
 }
