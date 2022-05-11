@@ -2,11 +2,10 @@ package chat
 
 import (
 	"fmt"
-	"io"
 	"reflect"
-	"time"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"golang.org/x/sync/errgroup"
 )
 
 type Hub struct {
@@ -23,70 +22,61 @@ func (h *Hub) ConnectUser(
 	}
 
 	h.connections.Set(username, conn)
-	h.pumpUser(username)
+	done := make(chan struct{})
+	defer close(done)
 
-	h.sendEvent(username, &EventUserListUpdate{
-		EventMeta: *NewEventMetaNow(),
-		Users:     h.connections.Keys(),
-	})
-
-	h.broadcastEvent(&EventNewUser{
+	// Shoot and forget
+	go h.broadcastEvent(&EventUserEnter{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
 	}, username)
 
+	// Shoot and forget
+	go h.broadcastEvent(&EventUserListUpdate{
+		EventMeta: *NewEventMetaNow(),
+		Users:     h.connections.Keys(),
+	})
+
+	if err := h.pumpUser(username); err != nil {
+		h.CloseUser(username)
+		return err
+	}
 	return nil
 }
 
-func (h *Hub) DisconnectUser(username string) error {
+func (h *Hub) CloseUser(username string) error {
 	conn, _ := h.connections.Get(username)
 	if conn != nil && !conn.Closed() {
 		conn.Close()
-
 	}
 	_ = h.connections.Remove(username)
+	// Shoot and forget
+	go h.broadcastEvent(&EventUserLeave{
+		EventMeta: *NewEventMetaNow(),
+		Name:      username,
+	})
+	// Shoot and forget
+	go h.broadcastEvent(&EventUserListUpdate{
+		EventMeta: *NewEventMetaNow(),
+		Users:     h.connections.Keys(),
+	})
 	return nil
 }
 
-func (h *Hub) pumpUser(username string) {
+func (h *Hub) pumpUser(username string) error {
 	conn, _ := h.connections.Get(username)
 	if conn == nil {
-		return
+		return fmt.Errorf(`user conn "%s" not found`, username)
 	}
-	logger := h.logger
-	go func() {
-		for {
-			e, err := conn.ReadEvent()
-
-			if err == io.EOF {
-				logger.Info("read event EOF",
-					map[string]any{
-						"user": username,
-					})
-				h.DisconnectUser(username)
-				return
-			}
-
-			if err != nil {
-				logger.Error("read event error (sleep)",
-					map[string]any{
-						"user":  username,
-						"error": err.Error(),
-					})
-				time.Sleep(time.Second)
-				continue
-			}
-
-			if err := h.handleEvent(username, e); err != nil {
-				logger.Error(
-					"could not handle user event",
-					map[string]any{
-						"user":  username,
-						"error": err.Error(),
-					})
-			}
+	for {
+		e, err := conn.ReadEvent()
+		if err != nil {
+			return err
 		}
-	}()
+		if err := h.handleEvent(username, e); err != nil {
+			return nil
+		}
+	}
 }
 
 func (h *Hub) handleEvent(username string, e Event) error {
@@ -99,9 +89,11 @@ func (h *Hub) handleEvent(username string, e Event) error {
 		})
 	switch t := e.(type) {
 	case *EventUserListUpdate:
-	case *EventNewUser:
+	case *EventUserEnter:
+	case *EventUserLeave:
 	case *EventSendMessage:
-		h.broadcastEvent(&EventNewMessage{
+		// Shoot and forget
+		go h.broadcastEvent(&EventNewMessage{
 			EventMeta: *NewEventMetaNow(),
 			Sender:    username,
 			Message:   t.Message,
@@ -117,32 +109,33 @@ func (h *Hub) handleEvent(username string, e Event) error {
 	return nil
 }
 
-func (h *Hub) broadcastEvent(e Event, exceptUsers ...string) {
+func (h *Hub) broadcastEvent(e Event, exceptUsers ...string) error {
 	except := map[string]bool{}
 	for _, n := range exceptUsers {
 		except[n] = true
 	}
+	eg := errgroup.Group{}
 	for _, username := range h.connections.Keys() {
 		if !except[username] {
-			go h.sendEvent(username, e)
+			username := username
+			eg.Go(func() error {
+				return h.sendEvent(username, e)
+			})
 		}
 	}
+	return eg.Wait()
 }
 
-func (h *Hub) sendEvent(username string, e Event) {
-	logger := h.logger
+func (h *Hub) sendEvent(username string, e Event) error {
 	conn, ok := h.connections.Get(username)
 	if !ok {
-		logger.Error(
-			"can not send message to unknown user",
-			map[string]any{
-				"user": username,
-			})
-		return
+		return fmt.Errorf(`unknown user conn "%s"`, username)
 	}
-	go func() {
-		conn.SendEvent(e)
-	}()
+	if err := conn.SendEvent(e); err != nil {
+		h.CloseUser(username) // unforgiving
+		return err
+	}
+	return nil
 }
 
 func NewHub(logger logging.Logger) *Hub {

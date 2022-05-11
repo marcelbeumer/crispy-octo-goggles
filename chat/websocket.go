@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sync"
 
 	ws "github.com/gorilla/websocket"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
@@ -14,7 +15,8 @@ import (
 
 var websocketHandlers = map[string]func() Event{
 	"userListUpdate": func() Event { return &EventUserListUpdate{} },
-	"newUser":        func() Event { return &EventNewUser{} },
+	"userEnter":      func() Event { return &EventUserEnter{} },
+	"userLeave":      func() Event { return &EventUserLeave{} },
 	"sendMessage":    func() Event { return &EventSendMessage{} },
 	"newMessage":     func() Event { return &EventNewMessage{} },
 }
@@ -54,10 +56,14 @@ type WebsocketConnection struct {
 	logger     logging.Logger
 	wsConn     *ws.Conn
 	eventOutCh chan Event
+	l          sync.RWMutex
 	closed     chan struct{}
 }
 
 func (c *WebsocketConnection) SendEvent(e Event) error {
+	c.l.Lock()
+	defer c.l.Unlock()
+
 	m := websocketMessage{Data: e}
 	eType := reflect.TypeOf(e)
 	eTypeStr := eType.String()
@@ -81,6 +87,7 @@ func (c *WebsocketConnection) SendEvent(e Event) error {
 	}
 
 	err = c.wsConn.WriteMessage(ws.TextMessage, jsonText)
+
 	if err != nil {
 		return fmt.Errorf(
 			"error writing event to ws with type <%s>: %w",
@@ -194,9 +201,9 @@ func (s *WebsocketServer) Start(addr string) error {
 }
 
 func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
-	logger := s.logger
-
-	logger.Info("http request", map[string]any{"remoteAddr": r.RemoteAddr})
+	fields := map[string]any{"remoteAddr": r.RemoteAddr}
+	logger := s.logger.WithFields(fields)
+	logger.Info("http request")
 
 	username := r.URL.Query().Get("username")
 	if username == "" {
@@ -217,30 +224,18 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info(
-		"new websocket connection",
-		map[string]any{"remoteAddr": wsConn.RemoteAddr()},
-	)
-
+	logger.Info("new websocket connection")
 	conn := NewWebsocketConnection(wsConn, logger)
 	defer conn.Close()
 
 	if err := s.hub.ConnectUser(username, conn); err != nil {
 		logger.Error(
-			"could not connect to room",
-			map[string]any{"remoteAddr": wsConn.RemoteAddr()},
+			"user disconnected with error",
+			map[string]any{"error": err},
 		)
-		return
 	}
 
-	for !conn.Closed() {
-		//
-	}
-
-	logger.Info(
-		"end of websocket connection",
-		map[string]any{"remoteAddr": wsConn.RemoteAddr()},
-	)
+	logger.Info("end of websocket connection")
 }
 
 func NewWebsocketClientConnection(
@@ -256,10 +251,7 @@ func NewWebsocketClientConnection(
 		RawQuery: q.Encode(),
 	}
 	serverUrl := u.String()
-	logger.Info(
-		"connecting to server",
-		map[string]any{"serverUrl": serverUrl},
-	)
+	logger.Info("connecting to server", map[string]any{"serverUrl": serverUrl})
 	wsConn, _, err := ws.DefaultDialer.Dial(serverUrl, nil)
 	if err != nil {
 		return nil, err

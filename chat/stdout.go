@@ -3,7 +3,6 @@ package chat
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"reflect"
 	"time"
@@ -19,84 +18,67 @@ type StdoutFrontend struct {
 func (f *StdoutFrontend) Start() error {
 	stop := make(chan struct{})
 	defer close(stop)
-
 	var err error
 	select {
-	case <-f.pumpEvents(stop):
-	case err = <-f.pumpStdin(stop):
+	case err = <-fnCh(func() error { return f.pumpEvents(stop) }):
+	case err = <-fnCh(func() error { return f.pumpStdin(stop) }):
 	}
 	return err
 }
 
-func (f *StdoutFrontend) pumpStdin(stop <-chan struct{}) <-chan error {
-	done := make(chan error)
+func (f *StdoutFrontend) pumpStdin(stop <-chan struct{}) error {
 	in := bufio.NewReader(os.Stdin)
 	input := []byte{}
-
-	go func() {
-		defer close(done)
-
-		for {
+	for {
+		select {
+		case <-stop:
+			return nil
+		default:
 			b, err := in.ReadByte() // no way to interrupt
 			if err != nil {
-				continue
+				return err
 			}
-
-			select {
-			case <-stop:
-				return
-			default:
-				if string(b) == "\n" {
-					msg := string(input)
-					input = []byte{} // reset
-					f.conn.SendEvent(&EventSendMessage{
-						EventMeta: EventMeta{Time: time.Now()},
-						Message:   msg,
-					})
-				} else {
-					input = append(input, b)
+			if string(b) == "\n" {
+				msg := string(input)
+				input = []byte{} // reset
+				err := f.conn.SendEvent(&EventSendMessage{
+					EventMeta: EventMeta{Time: time.Now()},
+					Message:   msg,
+				})
+				if err != nil {
+					return err
 				}
+			} else {
+				input = append(input, b)
 			}
 		}
-	}()
-
-	return done
+	}
 }
 
-func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan struct{} {
-	done := make(chan struct{})
-	logger := f.logger
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-
+func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) error {
+	for {
+		select {
+		case <-stop:
+			return nil
+		default:
+			logger := f.logger
 			e, err := f.conn.ReadEvent()
-
-			if err == io.EOF {
-				logger.Info("read event EOF")
-				return
-			}
-
 			if err != nil {
-				logger.Error("read event error (sleep)",
-					map[string]any{
-						"error": err.Error(),
-					})
-				time.Sleep(time.Second)
-				continue
+				return err
 			}
 
 			switch t := e.(type) {
 			case *EventUserListUpdate:
 				//
-			case *EventNewUser:
+			case *EventUserEnter:
 				fmt.Printf(
 					"[%s] <<user \"%s\" entered the room>>\n",
+					t.Time.Local(),
+					t.Name,
+				)
+			case *EventUserLeave:
+				fmt.Printf(
+					"[%s] <<user \"%s\" left the room>>\n",
 					t.Time.Local(),
 					t.Name,
 				)
@@ -114,8 +96,7 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan struct{} {
 					})
 			}
 		}
-	}()
-	return done
+	}
 }
 
 func NewStdoutFrontend(conn Connection, logger logging.Logger) *StdoutFrontend {

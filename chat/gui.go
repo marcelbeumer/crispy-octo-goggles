@@ -2,11 +2,9 @@ package chat
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
@@ -19,12 +17,10 @@ type GUIFrontend struct {
 }
 
 func (f *GUIFrontend) Start() error {
-	logger := f.logger
 	g := f.gui
-
 	g.Mouse = true
-
 	layoutReady := make(chan struct{})
+
 	g.SetManagerFunc(f.newManagerFunc(func() {
 		close(layoutReady)
 	}))
@@ -58,7 +54,6 @@ func (f *GUIFrontend) Start() error {
 		f.nextView,
 	)
 	if err != nil {
-		logger.Error(err.Error())
 		return err
 	}
 
@@ -69,84 +64,69 @@ func (f *GUIFrontend) Start() error {
 	)
 
 	if err != nil {
-		logger.Error(err.Error())
 		return err
 	}
 
 	stop := make(chan struct{})
 	defer close(stop)
+
 	defer g.Update(func(g *gocui.Gui) error {
 		return gocui.ErrQuit
 	})
 
 	select {
-	case err = <-f.guiPump():
-	case err = <-f.eventPump(layoutReady, stop):
+	case err = <-fnCh(func() error { return f.guiPump() }):
+	case err = <-fnCh(func() error {
+		<-layoutReady
+		return f.eventPump(stop)
+	}):
 	}
 	return err
 }
 
-func (f *GUIFrontend) guiPump() <-chan error {
+func (f *GUIFrontend) guiPump() error {
 	g := f.gui
-	done := make(chan error)
-	go func() {
-		defer close(done)
-		if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-			done <- err
-		} else {
-			done <- nil
-		}
-	}()
-	return done
+	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
+		return err
+	}
+	return nil
 }
 
-func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-chan error {
-	logger := f.logger
-	done := make(chan error)
-
-	go func() {
-		defer close(done)
-		<-start
-
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-			}
-
+func (f *GUIFrontend) eventPump(stop <-chan struct{}) error {
+	for {
+		select {
+		case <-stop:
+			return nil
+		default:
+			logger := f.logger
 			e, err := f.conn.ReadEvent()
-
-			if err == io.EOF {
-				logger.Info("read event EOF")
-				return
-			}
-
 			if err != nil {
-				logger.Error("read event error (sleep)",
-					map[string]any{
-						"error": err.Error(),
-					})
-				time.Sleep(time.Second)
-				continue
+				return err
 			}
 
 			switch t := e.(type) {
 			case *EventUserListUpdate:
 				if err := f.setUsers(t.Users); err != nil {
-					done <- err
+					return err
 				}
-
-			case *EventNewUser:
+			case *EventUserEnter:
 				msg := fmt.Sprintf(
 					"[%s] <<user \"%s\" entered the room>>",
 					t.Time.Local(),
 					t.Name,
 				)
 				if err := f.addMessageLine(msg); err != nil {
-					done <- err
+					return err
 				}
-
+			case *EventUserLeave:
+				msg := fmt.Sprintf(
+					"[%s] <<user \"%s\" left the room>>",
+					t.Time.Local(),
+					t.Name,
+				)
+				if err := f.addMessageLine(msg); err != nil {
+					return err
+				}
 			case *EventNewMessage:
 				msg := fmt.Sprintf(
 					"[%s %s] >> %s",
@@ -155,9 +135,8 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 					t.Message,
 				)
 				if err := f.addMessageLine(msg); err != nil {
-					done <- err
+					return err
 				}
-
 			default:
 				logger.Warn("unhandled event type",
 					map[string]any{
@@ -165,9 +144,7 @@ func (f *GUIFrontend) eventPump(start <-chan struct{}, stop <-chan struct{}) <-c
 					})
 			}
 		}
-	}()
-	return done
-
+	}
 }
 
 func (f *GUIFrontend) setUsers(usernames []string) error {

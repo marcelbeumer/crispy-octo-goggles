@@ -22,7 +22,12 @@ type EventUserListUpdate struct {
 	Users []string `json:"users"`
 }
 
-type EventNewUser struct {
+type EventUserEnter struct {
+	EventMeta
+	Name string `json:"name"`
+}
+
+type EventUserLeave struct {
 	EventMeta
 	Name string `json:"name"`
 }
