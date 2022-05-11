@@ -49,8 +49,8 @@ func (f *StdoutFrontend) pumpStdin(stop <-chan struct{}) <-chan error {
 				if string(b) == "\n" {
 					msg := string(input)
 					input = []byte{} // reset
-					f.conn.SendEvent(EventSendMessage{
-						EventMeta: EventMeta{Time: time.Now()},
+					f.conn.SendEvent(&EventSendMessage{
+						EventMeta: EventMeta{time: time.Now()},
 						Message:   msg,
 					})
 				} else {
@@ -92,18 +92,18 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) <-chan struct{} {
 			}
 
 			switch t := e.(type) {
-			case EventUserListUpdate:
+			case *EventUserListUpdate:
 				//
-			case EventNewUser:
+			case *EventNewUser:
 				fmt.Printf(
 					"[%s] <<user \"%s\" entered the room>>\n",
-					t.Time.Local(),
+					t.time.Local(),
 					t.Name,
 				)
-			case EventNewMessage:
+			case *EventNewMessage:
 				fmt.Printf(
 					"[%s %s] >> %s\n",
-					t.Time.Local(),
+					t.time.Local(),
 					t.Sender,
 					t.Message,
 				)

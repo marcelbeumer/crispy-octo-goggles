@@ -2,10 +2,19 @@ package chatbox
 
 import "time"
 
-type Event interface{}
+type Event interface {
+	// When returns time of the event.
+	// Important we define *something* more than interface{}
+	// for static analysis to work on *Struct{} vs Struct{}
+	When() time.Time
+}
 
 type EventMeta struct {
-	Time time.Time
+	time time.Time
+}
+
+func (e *EventMeta) When() time.Time {
+	return e.time
 }
 
 type EventUserListUpdate struct {
@@ -31,6 +40,6 @@ type EventNewMessage struct {
 
 func NewEventMetaNow() *EventMeta {
 	return &EventMeta{
-		Time: time.Now(),
+		time: time.Now(),
 	}
 }
