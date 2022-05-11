@@ -1,9 +1,6 @@
 package log
 
 import (
-	"io"
-	"os"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -37,9 +34,9 @@ func (l *ZapLogger) Named(s string) Logger {
 	return &ZapLogger{logger: named}
 }
 
-func NewZapLogger(out io.Writer, verbose bool, veryVerbose bool) (*ZapLogger, error) {
+func NewZapLogger(out zapcore.WriteSyncer, verbose bool, veryVerbose bool) (*ZapLogger, error) {
 	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
-	writer := zapcore.Lock(os.Stderr)
+	writer := zapcore.Lock(out)
 	levelEnabler := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		switch {
 		case veryVerbose:
