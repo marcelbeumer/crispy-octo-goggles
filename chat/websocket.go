@@ -37,7 +37,7 @@ func (m *websocketMessage) UnmarshalJSON(data []byte) error {
 
 	handler := websocketHandlers[raw.Name]
 	if handler == nil {
-		return fmt.Errorf("unknown event name \"%s\"", raw.Name)
+		return fmt.Errorf(`unknown event name "%s"`, raw.Name)
 	}
 
 	m.Name = raw.Name
@@ -57,44 +57,37 @@ type WebsocketConnection struct {
 	closed     chan struct{}
 }
 
-func (c *WebsocketConnection) SendEvent(e Event) {
-	logger := c.logger
-	go func() {
-		m := websocketMessage{Data: e}
-		eType := reflect.TypeOf(e)
+func (c *WebsocketConnection) SendEvent(e Event) error {
+	m := websocketMessage{Data: e}
+	eType := reflect.TypeOf(e)
+	eTypeStr := eType.String()
 
-		for name, handler := range websocketHandlers {
-			if reflect.TypeOf(handler()) == eType {
-				m.Name = name
-				break
-			}
+	for name, handler := range websocketHandlers {
+		if reflect.TypeOf(handler()) == eType {
+			m.Name = name
+			break
 		}
+	}
 
-		if m.Name == "" {
-			logger.Error(
-				"can not send message type over websocket",
-				map[string]any{"type": eType.String()},
-			)
-			return
-		}
+	if m.Name == "" {
+		return fmt.Errorf("unknown event type <%s>", eTypeStr)
+	}
 
-		jsonText, err := json.Marshal(&m)
-		if err != nil {
-			logger.Error(
-				"could marshal event to json",
-				map[string]any{"error": err},
-			)
-		}
+	jsonText, err := json.Marshal(&m)
+	if err != nil {
+		return fmt.Errorf(
+			"could not marshal event with type <%s>: %w",
+			eTypeStr, err)
+	}
 
-		err = c.wsConn.WriteMessage(ws.TextMessage, jsonText)
-		if err != nil {
-			logger.Info(
-				"websocket write error",
-				map[string]any{"error": err},
-			)
-			return
-		}
-	}()
+	err = c.wsConn.WriteMessage(ws.TextMessage, jsonText)
+	if err != nil {
+		return fmt.Errorf(
+			"error writing event to ws with type <%s>: %w",
+			eTypeStr, err)
+	}
+
+	return nil
 }
 
 func (c *WebsocketConnection) ReadEvent() (Event, error) {
@@ -125,65 +118,30 @@ func (c *WebsocketConnection) Close() error {
 	return nil
 }
 
-func (c *WebsocketConnection) wsReadPump() {
-	logger := c.logger
-	go func() {
-		for {
-			if c.Closed() {
-				return
+func (c *WebsocketConnection) wsReadPump() error {
+	for {
+		messageType, p, err := c.wsConn.ReadMessage()
+		if err != nil {
+			return err
+		}
+
+		switch messageType {
+		case ws.TextMessage:
+			var m websocketMessage
+			if err := json.Unmarshal(p, &m); err != nil {
+				return fmt.Errorf(`could not unmarshal message: %w`, err)
 			}
-
-			// TODO look closely here and implement correct error handling
-			messageType, p, err := c.wsConn.ReadMessage()
-			if err != nil {
-				logger.Error(
-					"websocket read error",
-					map[string]any{"error": err},
-				)
-				c.Close()
-				return
+			if m.Data == nil {
+				return fmt.Errorf("data was nil after parsing message")
 			}
-
-			logger.Debug(
-				"websocket received message",
-				map[string]any{"value": string(p)},
-			)
-
-			switch messageType {
-
-			case ws.TextMessage:
-				var m websocketMessage
-				if err := json.Unmarshal(p, &m); err != nil {
-					logger.Info(
-						"could not parse message",
-						map[string]any{"error": err},
-					)
-					continue
-				}
-				if m.Data == nil {
-					logger.Warn("data was nil after parsing message")
-					continue
-				}
-				logger.Info(
-					"sending web socket message data",
-					map[string]any{"name": m.Name},
-				)
-				select {
-				case <-c.closed:
-					return
-				case c.eventOutCh <- m.Data:
-					//
-				}
-
-			default:
-				logger.Info(
-					"websocket ignoring message type: %d",
-					map[string]any{"messageType": messageType},
-				)
+			select {
+			case <-c.closed:
+				return io.EOF
+			case c.eventOutCh <- m.Data:
+				//
 			}
 		}
-	}()
-	return
+	}
 }
 
 func NewWebsocketConnection(
@@ -196,7 +154,18 @@ func NewWebsocketConnection(
 		eventOutCh: make(chan Event),
 		closed:     make(chan struct{}),
 	}
-	conn.wsReadPump()
+	go func() {
+		defer conn.Close()
+		err := conn.wsReadPump()
+		if err == io.EOF {
+			logger.Info("websocket pump closed (EOF)")
+		} else {
+			logger.Error(
+				"websocket pump error",
+				map[string]any{"error": err},
+			)
+		}
+	}()
 	return &conn
 }
 

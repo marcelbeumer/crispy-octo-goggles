@@ -5,8 +5,8 @@ import (
 )
 
 type Connection interface {
-	// SendEvent posts event. Non-blocking, shoot and forget
-	SendEvent(e Event)
+	// SendEvent posts event
+	SendEvent(e Event) error
 	// ReceiveEvent wait for next Event. Error when reading fails.
 	// Returns error io.EOF when connection closed
 	ReadEvent() (Event, error)
@@ -23,10 +23,9 @@ type TestConnection struct {
 	closed     chan struct{}
 }
 
-func (c *TestConnection) SendEvent(e Event) {
-	go func() {
-		c.EventOutCh <- e
-	}()
+func (c *TestConnection) SendEvent(e Event) error {
+	c.EventOutCh <- e
+	return nil
 }
 
 func (c *TestConnection) ReadEvent() (Event, error) {
