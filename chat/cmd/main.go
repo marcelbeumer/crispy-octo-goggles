@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
 )
 
 type ClientServerOpts struct {
@@ -40,41 +42,58 @@ func main() {
 		kong.UsageOnError(),
 	)
 
-	logger := log.NewDefaultLogger(cli.Verbose, cli.VeryVerbose)
-	log.SetStandardLogger(logger)
-
 	switch ctx.Command() {
 
 	case "client":
+		stdErrBuf := bufio.NewWriter(os.Stderr)
+		defer stdErrBuf.Flush()
+
+		logger := logging.NewDefaultLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
+		logging.SetStandardLogger(logger)
+
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
 		conn, err := chat.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
 		if err != nil {
-			panic(err)
+			logger.Error(
+				"could not connect websocket",
+				map[string]any{"error": err.Error(), "addr": addr},
+			)
+			os.Exit(1)
 		}
 
 		defer conn.Close()
 
+		frontendErr := func(err error) {
+			logger.Error("frontend error", map[string]any{"error": err.Error()})
+			os.Exit(1)
+		}
+
 		if cli.Client.StdoutFrontend {
 			fe := chat.NewStdoutFrontend(conn, logger)
 			if err := fe.Start(); err != nil {
-				panic(err)
+				frontendErr(err)
 			}
 		} else {
 			fe, err := chat.NewGUIFrontend(conn, logger)
 			if err != nil {
-				panic(err)
+				frontendErr(err)
 			}
 			if err := fe.Start(); err != nil {
-				panic(err)
+				frontendErr(err)
 			}
 		}
 
 	case "server":
+		logger := logging.NewDefaultLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
+		logging.SetStandardLogger(logger)
+
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		s := chat.NewWebsocketServer(logger)
+
 		if err := s.Start(addr); err != nil {
-			panic(err)
+			logger.Error("server error", map[string]any{"error": err.Error()})
+			os.Exit(1)
 		}
 
 	case "test":

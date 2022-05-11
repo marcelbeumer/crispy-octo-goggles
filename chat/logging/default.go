@@ -1,15 +1,15 @@
-package log
+package logging
 
 import (
-	"os"
+	"io"
 
 	"github.com/rs/zerolog"
 	zerologadapter "logur.dev/adapter/zerolog"
 )
 
-func NewDefaultLogger(verbose bool, veryVerbose bool) *LoggerAdapter {
+func NewDefaultLogger(out io.Writer, verbose bool, veryVerbose bool) *LoggerAdapter {
 	l := zerolog.
-		New(os.Stderr).
+		New(out).
 		With().
 		Timestamp().
 		Logger()

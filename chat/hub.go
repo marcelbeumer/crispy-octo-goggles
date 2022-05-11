@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
 )
 
 type Hub struct {
-	logger      log.Logger
+	logger      logging.Logger
 	connections *SafeMap[Connection]
 }
 
@@ -145,7 +145,7 @@ func (h *Hub) sendEvent(username string, e Event) {
 	}()
 }
 
-func NewHub(logger log.Logger) *Hub {
+func NewHub(logger logging.Logger) *Hub {
 	return &Hub{
 		logger:      logger,
 		connections: NewSafeMap[Connection](),

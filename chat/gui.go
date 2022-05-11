@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/awesome-gocui/gocui"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
 )
 
 type GUIFrontend struct {
-	logger log.Logger
+	logger logging.Logger
 	conn   Connection
 	gui    *gocui.Gui
 }
@@ -299,8 +299,8 @@ func (f *GUIFrontend) quit(g *gocui.Gui, v *gocui.View) error {
 	return gocui.ErrQuit
 }
 
-func NewGUIFrontend(conn Connection, logger log.Logger) (*GUIFrontend, error) {
-	g, err := gocui.NewGui(gocui.OutputNormal, true)
+func NewGUIFrontend(conn Connection, logger logging.Logger) (*GUIFrontend, error) {
+	g, err := gocui.NewGui(gocui.OutputTrue, true)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 	"reflect"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
 )
 
 var websocketHandlers = map[string]func() Event{
@@ -51,7 +51,7 @@ func (m *websocketMessage) UnmarshalJSON(data []byte) error {
 }
 
 type WebsocketConnection struct {
-	logger     log.Logger
+	logger     logging.Logger
 	wsConn     *ws.Conn
 	eventOutCh chan Event
 	closed     chan struct{}
@@ -146,7 +146,7 @@ func (c *WebsocketConnection) wsReadPump() error {
 
 func NewWebsocketConnection(
 	wsConn *ws.Conn,
-	logger log.Logger,
+	logger logging.Logger,
 ) *WebsocketConnection {
 	conn := WebsocketConnection{
 		logger:     logger,
@@ -170,12 +170,12 @@ func NewWebsocketConnection(
 }
 
 type WebsocketServer struct {
-	logger   log.Logger
+	logger   logging.Logger
 	upgrader ws.Upgrader
 	hub      *Hub
 }
 
-func NewWebsocketServer(logger log.Logger) *WebsocketServer {
+func NewWebsocketServer(logger logging.Logger) *WebsocketServer {
 	return &WebsocketServer{
 		logger: logger,
 		hub:    NewHub(logger),
@@ -246,7 +246,7 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 func NewWebsocketClientConnection(
 	serverAddr string,
 	username string,
-	logger log.Logger,
+	logger logging.Logger,
 ) (*WebsocketConnection, error) {
 	q := url.Values{"username": []string{username}}
 	u := url.URL{
