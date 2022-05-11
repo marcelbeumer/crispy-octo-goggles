@@ -6,7 +6,8 @@
 
 ## TODO
 
-- Properly handle buffering/backpressure
-- Streamline logging (messy now; also consider other API; see what others do)
+- Make own logging interfaces around zap (non sugar) and remove logur
+- Improve logging
+- Properly handle buffering/backpressure (if needed)
 - Unit tests
 - Production setup: Dockerfile, client install/usage instructions
