@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 var websocketHandlers = map[string]func() Event{
@@ -53,7 +53,7 @@ func (m *websocketMessage) UnmarshalJSON(data []byte) error {
 }
 
 type WebsocketConnection struct {
-	logger     logging.Logger
+	logger     log.Logger
 	wsConn     *ws.Conn
 	eventOutCh chan Event
 	l          sync.RWMutex
@@ -153,7 +153,7 @@ func (c *WebsocketConnection) wsReadPump() error {
 
 func NewWebsocketConnection(
 	wsConn *ws.Conn,
-	logger logging.Logger,
+	logger log.Logger,
 ) *WebsocketConnection {
 	conn := WebsocketConnection{
 		logger:     logger,
@@ -167,19 +167,19 @@ func NewWebsocketConnection(
 		if err == io.EOF {
 			logger.Infow("websocket pump closed (EOF)")
 		} else {
-			logger.Errorw("websocket pump error", logging.Error(err))
+			logger.Errorw("websocket pump error", log.Error(err))
 		}
 	}()
 	return &conn
 }
 
 type WebsocketServer struct {
-	logger   logging.Logger
+	logger   log.Logger
 	upgrader ws.Upgrader
 	hub      *Hub
 }
 
-func NewWebsocketServer(logger logging.Logger) *WebsocketServer {
+func NewWebsocketServer(logger log.Logger) *WebsocketServer {
 	return &WebsocketServer{
 		logger: logger,
 		hub:    NewHub(logger),
@@ -215,7 +215,7 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Infow(
 			"could not upgrade connection",
-			logging.Error(err),
+			log.Error(err),
 		)
 		return
 	}
@@ -227,7 +227,7 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 	if err := s.hub.ConnectUser(username, conn); err != nil {
 		logger.Errorw(
 			"user disconnected with error",
-			logging.Error(err),
+			log.Error(err),
 		)
 	}
 
@@ -237,7 +237,7 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 func NewWebsocketClientConnection(
 	serverAddr string,
 	username string,
-	logger logging.Logger,
+	logger log.Logger,
 ) (*WebsocketConnection, error) {
 	q := url.Values{"username": []string{username}}
 	u := url.URL{

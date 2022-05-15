@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type StdoutFrontend struct {
-	logger logging.Logger
+	logger log.Logger
 	conn   Connection
 }
 

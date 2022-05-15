@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 	"golang.org/x/sync/errgroup"
 )
 
 type Hub struct {
-	logger      logging.Logger
+	logger      log.Logger
 	connections *SafeMap[Connection]
 }
 
@@ -131,7 +131,7 @@ func (h *Hub) sendEvent(username string, e Event) error {
 	return nil
 }
 
-func NewHub(logger logging.Logger) *Hub {
+func NewHub(logger log.Logger) *Hub {
 	return &Hub{
 		logger:      logger,
 		connections: NewSafeMap[Connection](),

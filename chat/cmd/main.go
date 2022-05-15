@@ -7,7 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type ClientServerOpts struct {
@@ -47,10 +47,10 @@ func main() {
 	case "client":
 		stdErrBuf := bufio.NewWriter(os.Stderr)
 		defer stdErrBuf.Flush()
-		zl := logging.NewZapLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
+		zl := log.NewZapLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
 		defer zl.Sync()
-		logging.RedirectStdLog(zl)
-		logger := logging.NewZapLoggerAdapter(zl)
+		log.RedirectStdLog(zl)
+		logger := log.NewZapLoggerAdapter(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
@@ -58,7 +58,7 @@ func main() {
 		if err != nil {
 			logger.Errorw(
 				"could not connect websocket",
-				logging.Error(err),
+				log.Error(err),
 				"addr", addr,
 			)
 			os.Exit(1)
@@ -67,7 +67,7 @@ func main() {
 		defer conn.Close()
 
 		frontendErr := func(err error) {
-			logger.Error("frontend error", logging.Error(err))
+			logger.Error("frontend error", log.Error(err))
 			os.Exit(1)
 		}
 
@@ -87,16 +87,16 @@ func main() {
 		}
 
 	case "server":
-		zl := logging.NewZapLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
+		zl := log.NewZapLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
 		defer zl.Sync()
-		logging.RedirectStdLog(zl)
-		logger := logging.NewZapLoggerAdapter(zl)
+		log.RedirectStdLog(zl)
+		logger := log.NewZapLoggerAdapter(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		s := chat.NewWebsocketServer(logger)
 
 		if err := s.Start(addr); err != nil {
-			logger.Error("server error", logging.Error(err))
+			logger.Error("server error", log.Error(err))
 			os.Exit(1)
 		}
 

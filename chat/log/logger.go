@@ -1,4 +1,4 @@
-package logging
+package log
 
 // Field can be used to pass strongly typed objects to
 // the logger, like this:
