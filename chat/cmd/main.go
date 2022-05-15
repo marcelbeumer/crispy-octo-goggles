@@ -48,8 +48,9 @@ func main() {
 		stdErrBuf := bufio.NewWriter(os.Stderr)
 		defer stdErrBuf.Flush()
 		zl := logging.NewZapLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
-		logger := logging.NewZapLoggerAdapter(zl)
+		defer zl.Sync()
 		logging.RedirectStdLog(zl)
+		logger := logging.NewZapLoggerAdapter(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
@@ -57,7 +58,7 @@ func main() {
 		if err != nil {
 			logger.Errorw(
 				"could not connect websocket",
-				"error", err.Error(),
+				logging.Error(err),
 				"addr", addr,
 			)
 			os.Exit(1)
@@ -66,7 +67,7 @@ func main() {
 		defer conn.Close()
 
 		frontendErr := func(err error) {
-			logger.Error("frontend error", "error", err.Error())
+			logger.Error("frontend error", logging.Error(err))
 			os.Exit(1)
 		}
 
@@ -87,17 +88,19 @@ func main() {
 
 	case "server":
 		zl := logging.NewZapLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
-		logger := logging.NewZapLoggerAdapter(zl)
+		defer zl.Sync()
 		logging.RedirectStdLog(zl)
+		logger := logging.NewZapLoggerAdapter(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		s := chat.NewWebsocketServer(logger)
 
 		if err := s.Start(addr); err != nil {
-			logger.Error("server error", "error", err.Error())
+			logger.Error("server error", logging.Error(err))
 			os.Exit(1)
 		}
 
 	case "test":
+
 	}
 }

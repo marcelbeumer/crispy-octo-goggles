@@ -167,9 +167,7 @@ func NewWebsocketConnection(
 		if err == io.EOF {
 			logger.Infow("websocket pump closed (EOF)")
 		} else {
-			logger.Errorw(
-				"websocket pump error",
-				"error", err)
+			logger.Errorw("websocket pump error", logging.Error(err))
 		}
 	}()
 	return &conn
@@ -217,7 +215,7 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Infow(
 			"could not upgrade connection",
-			"error", err,
+			logging.Error(err),
 		)
 		return
 	}
@@ -229,7 +227,7 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 	if err := s.hub.ConnectUser(username, conn); err != nil {
 		logger.Errorw(
 			"user disconnected with error",
-			"error", err,
+			logging.Error(err),
 		)
 	}
 
