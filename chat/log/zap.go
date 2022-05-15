@@ -8,7 +8,7 @@ import (
 )
 
 // ZapLoggerAdapter implements Logger for zap.
-// It seems somewhat complicated and verbose to simply wrap a logger
+// It seems somewhat complicated and verbose for wrapping a logger
 // but I don't see how to to do it better in Go
 type ZapLoggerAdapter struct {
 	logger *zap.SugaredLogger
