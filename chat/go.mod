@@ -6,11 +6,8 @@ require (
 	github.com/alecthomas/kong v0.5.0
 	github.com/awesome-gocui/gocui v1.1.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/rs/zerolog v1.26.1
 	go.uber.org/zap v1.21.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	logur.dev/adapter/zerolog v0.6.0
-	logur.dev/logur v0.17.0
 )
 
 require (
