@@ -2,7 +2,7 @@ package log
 
 // Field can be used to pass strongly typed objects to
 // the logger, like this:
-// `logger.Infow("oops", errors.New("something failed"))`
+// `logger.Infow("oops", log.Error(err))`
 type Field interface {
 	// isField is a dummy method so we don't have an empty interface
 	isField() bool
