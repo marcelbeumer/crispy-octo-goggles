@@ -1,4 +1,4 @@
-package log
+package logging
 
 // https://pkg.go.dev/go.uber.org/zap#SugaredLogger
 type Logger interface {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
 )
 
 type ClientServerOpts struct {
@@ -47,9 +47,9 @@ func main() {
 	case "client":
 		stdErrBuf := bufio.NewWriter(os.Stderr)
 		defer stdErrBuf.Flush()
-		zl := log.NewZapLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
-		logger := log.NewZapLoggerAdapter(zl)
-		log.RedirectStdLog(zl)
+		zl := logging.NewZapLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
+		logger := logging.NewZapLoggerAdapter(zl)
+		logging.RedirectStdLog(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
@@ -86,9 +86,9 @@ func main() {
 		}
 
 	case "server":
-		zl := log.NewZapLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
-		logger := log.NewZapLoggerAdapter(zl)
-		log.RedirectStdLog(zl)
+		zl := logging.NewZapLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
+		logger := logging.NewZapLoggerAdapter(zl)
+		logging.RedirectStdLog(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		s := chat.NewWebsocketServer(logger)

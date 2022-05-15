@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
 )
 
 type StdoutFrontend struct {
-	logger log.Logger
+	logger logging.Logger
 	conn   Connection
 }
 
@@ -98,7 +98,7 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) error {
 	}
 }
 
-func NewStdoutFrontend(conn Connection, logger log.Logger) *StdoutFrontend {
+func NewStdoutFrontend(conn Connection, logger logging.Logger) *StdoutFrontend {
 	return &StdoutFrontend{
 		logger: logger,
 		conn:   conn,
