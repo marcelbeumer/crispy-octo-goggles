@@ -6,7 +6,6 @@
 
 ## TODO
 
-- Make own logging interfaces around zap (non sugar) and remove logur
 - Improve logging
 - Properly handle buffering/backpressure (if needed)
 - Unit tests
