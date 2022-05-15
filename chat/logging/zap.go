@@ -116,8 +116,6 @@ func RedirectStdLog(l *zap.Logger) {
 }
 
 // ZapFieldAdapter implements Field for zap.
-// It seems somewhat complicated and verbose to simply wrap a logger
-// but I don't see how to to do it better in Go
 type ZapFieldAdapter struct{ f zap.Field }
 
 // isField is a dummy method so we don't have an empty interface
