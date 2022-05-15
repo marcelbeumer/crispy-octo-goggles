@@ -7,16 +7,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// mapFields maps ZapFieldAdapter to zap.Field
-func mapFields(args []any) {
-	for i, v := range args {
-		// println(reflect.TypeOf(v).String())
-		if t, ok := v.(*ZapFieldAdapter); ok {
-			args[i] = zap.Field(t.f)
-		}
-	}
-}
-
 // ZapLoggerAdapter implements Logger for zap.
 // It seems somewhat complicated and verbose to simply wrap a logger
 // but I don't see how to to do it better in Go
@@ -113,16 +103,4 @@ func NewZapLoggerAdapter(
 
 func RedirectStdLog(l *zap.Logger) {
 	zap.RedirectStdLog(l)
-}
-
-// ZapFieldAdapter implements Field for zap.
-type ZapFieldAdapter struct{ f zap.Field }
-
-// isField is a dummy method so we don't have an empty interface
-func (a ZapFieldAdapter) isField() bool {
-	return true
-}
-
-func Error(err error) Field {
-	return &ZapFieldAdapter{f: zap.Error(err)}
 }
