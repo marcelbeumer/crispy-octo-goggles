@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 	"golang.org/x/sync/errgroup"
 )
 
 type Hub struct {
-	logger      logging.Logger
+	logger      log.Logger
 	connections *SafeMap[Connection]
 }
 
@@ -81,12 +81,6 @@ func (h *Hub) pumpUser(username string) error {
 
 func (h *Hub) handleEvent(username string, e Event) error {
 	logger := h.logger
-	logger.Debug(
-		"handling event",
-		map[string]any{
-			"user": username,
-			"type": reflect.TypeOf(e).String(),
-		})
 	switch t := e.(type) {
 	case *EventUserListUpdate:
 	case *EventUserEnter:
@@ -100,11 +94,10 @@ func (h *Hub) handleEvent(username string, e Event) error {
 		})
 	case *EventNewMessage:
 	default:
-		logger.Warn("unhandled event type",
-			map[string]any{
-				"user": username,
-				"type": reflect.TypeOf(e).String(),
-			})
+		logger.Warnw(
+			"unhandled event type",
+			"user", username,
+			"type", reflect.TypeOf(e).String())
 	}
 	return nil
 }
@@ -138,7 +131,7 @@ func (h *Hub) sendEvent(username string, e Event) error {
 	return nil
 }
 
-func NewHub(logger logging.Logger) *Hub {
+func NewHub(logger log.Logger) *Hub {
 	return &Hub{
 		logger:      logger,
 		connections: NewSafeMap[Connection](),

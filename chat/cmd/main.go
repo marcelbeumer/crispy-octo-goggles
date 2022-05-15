@@ -7,7 +7,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type ClientServerOpts struct {
@@ -47,17 +47,19 @@ func main() {
 	case "client":
 		stdErrBuf := bufio.NewWriter(os.Stderr)
 		defer stdErrBuf.Flush()
-
-		logger := logging.NewDefaultLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
-		logging.SetStandardLogger(logger)
+		zl := log.NewZapLogger(stdErrBuf, cli.Verbose, cli.VeryVerbose)
+		defer zl.Sync()
+		log.RedirectStdLog(zl)
+		logger := log.NewZapLoggerAdapter(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
 		conn, err := chat.NewWebsocketClientConnection(addr, cli.Client.Username, logger)
 		if err != nil {
-			logger.Error(
+			logger.Errorw(
 				"could not connect websocket",
-				map[string]any{"error": err.Error(), "addr": addr},
+				log.Error(err),
+				"addr", addr,
 			)
 			os.Exit(1)
 		}
@@ -65,7 +67,7 @@ func main() {
 		defer conn.Close()
 
 		frontendErr := func(err error) {
-			logger.Error("frontend error", map[string]any{"error": err.Error()})
+			logger.Error("frontend error", log.Error(err))
 			os.Exit(1)
 		}
 
@@ -85,17 +87,20 @@ func main() {
 		}
 
 	case "server":
-		logger := logging.NewDefaultLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
-		logging.SetStandardLogger(logger)
+		zl := log.NewZapLogger(os.Stderr, cli.Verbose, cli.VeryVerbose)
+		defer zl.Sync()
+		log.RedirectStdLog(zl)
+		logger := log.NewZapLoggerAdapter(zl)
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 		s := chat.NewWebsocketServer(logger)
 
 		if err := s.Start(addr); err != nil {
-			logger.Error("server error", map[string]any{"error": err.Error()})
+			logger.Error("server error", log.Error(err))
 			os.Exit(1)
 		}
 
 	case "test":
+
 	}
 }

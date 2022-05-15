@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 var websocketHandlers = map[string]func() Event{
@@ -53,7 +53,7 @@ func (m *websocketMessage) UnmarshalJSON(data []byte) error {
 }
 
 type WebsocketConnection struct {
-	logger     logging.Logger
+	logger     log.Logger
 	wsConn     *ws.Conn
 	eventOutCh chan Event
 	l          sync.RWMutex
@@ -153,7 +153,7 @@ func (c *WebsocketConnection) wsReadPump() error {
 
 func NewWebsocketConnection(
 	wsConn *ws.Conn,
-	logger logging.Logger,
+	logger log.Logger,
 ) *WebsocketConnection {
 	conn := WebsocketConnection{
 		logger:     logger,
@@ -165,24 +165,21 @@ func NewWebsocketConnection(
 		defer conn.Close()
 		err := conn.wsReadPump()
 		if err == io.EOF {
-			logger.Info("websocket pump closed (EOF)")
+			logger.Infow("websocket pump closed (EOF)")
 		} else {
-			logger.Error(
-				"websocket pump error",
-				map[string]any{"error": err},
-			)
+			logger.Errorw("websocket pump error", log.Error(err))
 		}
 	}()
 	return &conn
 }
 
 type WebsocketServer struct {
-	logger   logging.Logger
+	logger   log.Logger
 	upgrader ws.Upgrader
 	hub      *Hub
 }
 
-func NewWebsocketServer(logger logging.Logger) *WebsocketServer {
+func NewWebsocketServer(logger log.Logger) *WebsocketServer {
 	return &WebsocketServer{
 		logger: logger,
 		hub:    NewHub(logger),
@@ -195,21 +192,20 @@ func NewWebsocketServer(logger logging.Logger) *WebsocketServer {
 
 func (s *WebsocketServer) Start(addr string) error {
 	logger := s.logger
-	logger.Info("starting server", map[string]any{"addr": addr})
+	logger.Infow("starting server", "addr", addr)
 	err := http.ListenAndServe(addr, http.HandlerFunc(s.handleHttp))
 	return err
 }
 
 func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
-	fields := map[string]any{"remoteAddr": r.RemoteAddr}
-	logger := s.logger.WithFields(fields)
+	logger := s.logger.With("remoteAddr", r.RemoteAddr)
 	logger.Info("http request")
 
 	username := r.URL.Query().Get("username")
 	if username == "" {
-		logger.Info(
+		logger.Infow(
 			"reject connection",
-			map[string]any{"reason": "no username provided"},
+			"reason", "no username provided",
 		)
 		http.Error(w, "No username provided", http.StatusBadRequest)
 		return
@@ -217,31 +213,31 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 
 	wsConn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Info(
+		logger.Infow(
 			"could not upgrade connection",
-			map[string]any{"error": err},
+			log.Error(err),
 		)
 		return
 	}
 
-	logger.Info("new websocket connection")
+	logger.Infow("new websocket connection")
 	conn := NewWebsocketConnection(wsConn, logger)
 	defer conn.Close()
 
 	if err := s.hub.ConnectUser(username, conn); err != nil {
-		logger.Error(
+		logger.Errorw(
 			"user disconnected with error",
-			map[string]any{"error": err},
+			log.Error(err),
 		)
 	}
 
-	logger.Info("end of websocket connection")
+	logger.Infow("end of websocket connection")
 }
 
 func NewWebsocketClientConnection(
 	serverAddr string,
 	username string,
-	logger logging.Logger,
+	logger log.Logger,
 ) (*WebsocketConnection, error) {
 	q := url.Values{"username": []string{username}}
 	u := url.URL{
@@ -251,7 +247,9 @@ func NewWebsocketClientConnection(
 		RawQuery: q.Encode(),
 	}
 	serverUrl := u.String()
-	logger.Info("connecting to server", map[string]any{"serverUrl": serverUrl})
+	logger.Infow(
+		"connecting to server",
+		"serverUrl", serverUrl)
 	wsConn, _, err := ws.DefaultDialer.Dial(serverUrl, nil)
 	if err != nil {
 		return nil, err
