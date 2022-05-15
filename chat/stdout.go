@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/logging"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
 type StdoutFrontend struct {
-	logger logging.Logger
+	logger log.Logger
 	conn   Connection
 }
 
@@ -90,16 +90,15 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) error {
 					t.Message,
 				)
 			default:
-				logger.Warn("unhandled event type",
-					map[string]any{
-						"type": reflect.TypeOf(e).String(),
-					})
+				logger.Warnw(
+					"unhandled event type",
+					"type", reflect.TypeOf(e).String())
 			}
 		}
 	}
 }
 
-func NewStdoutFrontend(conn Connection, logger logging.Logger) *StdoutFrontend {
+func NewStdoutFrontend(conn Connection, logger log.Logger) *StdoutFrontend {
 	return &StdoutFrontend{
 		logger: logger,
 		conn:   conn,

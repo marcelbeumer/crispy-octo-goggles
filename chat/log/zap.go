@@ -1,42 +1,73 @@
 package log
 
 import (
+	"io"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-type ZapLogger struct {
+type ZapLoggerAdapter struct {
 	logger *zap.SugaredLogger
 }
 
-func (l *ZapLogger) Debug(args ...any) {
+func (l *ZapLoggerAdapter) Debug(args ...any) {
 	l.logger.Debug(args...)
 }
 
-func (l *ZapLogger) Info(args ...any) {
+func (l *ZapLoggerAdapter) Debugw(msg string, keysAndValues ...any) {
+	l.logger.Debugw(msg, keysAndValues...)
+}
+
+func (l *ZapLoggerAdapter) Info(args ...any) {
 	l.logger.Info(args...)
 }
 
-func (l *ZapLogger) Warn(args ...any) {
+func (l *ZapLoggerAdapter) Infow(msg string, keysAndValues ...any) {
+	l.logger.Infow(msg, keysAndValues...)
+}
+
+func (l *ZapLoggerAdapter) Warn(args ...any) {
 	l.logger.Warn(args...)
 }
 
-func (l *ZapLogger) Error(args ...any) {
+func (l *ZapLoggerAdapter) Warnw(msg string, keysAndValues ...any) {
+	l.logger.Warnw(msg, keysAndValues...)
+}
+
+func (l *ZapLoggerAdapter) Error(args ...any) {
 	l.logger.Error(args...)
 }
 
-func (l *ZapLogger) Fatal(args ...any) {
+func (l *ZapLoggerAdapter) Errorw(msg string, keysAndValues ...any) {
+	l.logger.Errorw(msg, keysAndValues...)
+}
+
+func (l *ZapLoggerAdapter) Fatal(args ...any) {
 	l.logger.Fatal(args...)
 }
 
-func (l *ZapLogger) Named(s string) Logger {
-	named := l.logger.Named(s)
-	return &ZapLogger{logger: named}
+func (l *ZapLoggerAdapter) Fatalw(msg string, keysAndValues ...any) {
+	l.logger.Fatalw(msg, keysAndValues...)
 }
 
-func NewZapLogger(out zapcore.WriteSyncer, verbose bool, veryVerbose bool) (*ZapLogger, error) {
+func (l *ZapLoggerAdapter) Named(s string) Logger {
+	named := l.logger.Named(s)
+	return &ZapLoggerAdapter{logger: named}
+}
+
+func (l *ZapLoggerAdapter) With(args ...any) Logger {
+	with := l.logger.With(args...)
+	return &ZapLoggerAdapter{logger: with}
+}
+
+func NewZapLogger(
+	out io.Writer,
+	verbose bool,
+	veryVerbose bool,
+) *zap.Logger {
 	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
-	writer := zapcore.Lock(out)
+	writer := zapcore.Lock(zapcore.AddSync(out))
 	levelEnabler := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		switch {
 		case veryVerbose:
@@ -48,7 +79,15 @@ func NewZapLogger(out zapcore.WriteSyncer, verbose bool, veryVerbose bool) (*Zap
 		}
 	})
 	core := zapcore.NewCore(encoder, writer, levelEnabler)
-	zl := zap.New(core).Sugar()
-	logger := &ZapLogger{logger: zl}
-	return logger, nil
+	return zap.New(core)
+}
+
+func NewZapLoggerAdapter(
+	zl *zap.Logger,
+) *ZapLoggerAdapter {
+	return &ZapLoggerAdapter{logger: zl.Sugar()}
+}
+
+func RedirectStdLog(l *zap.Logger) {
+	zap.RedirectStdLog(l)
 }
