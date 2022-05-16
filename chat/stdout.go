@@ -98,7 +98,7 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) error {
 	}
 }
 
-func NewStdoutFrontend(conn Connection, logger logging.Logger) *StdoutFrontend {
+func NewStdoutFrontend(conn Connection, logger log.Logger) *StdoutFrontend {
 	return &StdoutFrontend{
 		logger: logger,
 		conn:   conn,
