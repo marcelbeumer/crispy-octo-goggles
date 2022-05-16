@@ -2,8 +2,8 @@ package chat
 
 import (
 	"testing"
-	"time"
 
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,29 +22,14 @@ func TestFnChReturnsFnResultInChannel(t *testing.T) {
 	fn := func() int { return expected }
 	ch := fnCh(fn)
 
-	select {
-	case result := <-ch:
-		assert.Equal(t, expected, result)
-	case <-time.After(time.Second):
-		t.Fatal("timeout")
-	}
+	result := test.ChTimeout(t, ch)
+	assert.Equal(t, expected, result)
 }
 
 func TestFnChClosesReturnCh(t *testing.T) {
 	fn := func() int { return 1 }
 	ch := fnCh(fn)
 
-	select {
-	case r := <-ch:
-		assert.Equal(t, 1, r)
-	case <-time.After(time.Second):
-		t.Fatal("timeout")
-	}
-
-	select {
-	case r := <-ch:
-		assert.Equal(t, 0, r) // closed zero value
-	case <-time.After(time.Second):
-		t.Fatal("timeout")
-	}
+	assert.Equal(t, 1, test.ChTimeout(t, ch))
+	assert.Equal(t, 0, test.ChTimeout(t, ch)) // closed zero value
 }
