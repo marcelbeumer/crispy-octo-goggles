@@ -64,6 +64,12 @@ func (c *WebsocketConnection) SendEvent(e Event) error {
 	c.l.Lock()
 	defer c.l.Unlock()
 
+	select {
+	case <-c.closed:
+		return ErrConnectionClosed
+	default:
+	}
+
 	m := websocketMessage{Data: e}
 	eType := reflect.TypeOf(e)
 	eTypeStr := eType.String()
