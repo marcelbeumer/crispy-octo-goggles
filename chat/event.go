@@ -2,6 +2,12 @@ package chat
 
 import "time"
 
+// now can be overridden in tests
+var now = func() time.Time {
+	return time.Now()
+}
+
+// Event is the interface for all events
 type Event interface {
 	// When returns time of the event.
 	// Important we define *something* more than interface{}
@@ -9,12 +15,22 @@ type Event interface {
 	When() time.Time
 }
 
+// EventMeta is a base struct for other events to include
+// basic meta data that all events have
 type EventMeta struct {
 	Time time.Time `json:"time"`
 }
 
+// When returns the time of the event.
 func (e *EventMeta) When() time.Time {
 	return e.Time
+}
+
+// NewEventMetaNow returns EventMeta with time set to "now".
+func NewEventMetaNow() *EventMeta {
+	return &EventMeta{
+		Time: now(),
+	}
 }
 
 type EventUserListUpdate struct {
@@ -41,10 +57,4 @@ type EventNewMessage struct {
 	EventMeta
 	Sender  string `json:"sender"`
 	Message string `json:"message"`
-}
-
-func NewEventMetaNow() *EventMeta {
-	return &EventMeta{
-		Time: time.Now(),
-	}
 }
