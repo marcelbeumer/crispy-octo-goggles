@@ -38,7 +38,7 @@ func (h *Hub) ConnectUser(
 		Users:     h.connections.Keys(),
 	})
 
-	if err := h.pumpUser(username); err != nil {
+	if err := h.pumpFromUser(username); err != nil {
 		h.CloseUser(username)
 		return err
 	}
@@ -64,7 +64,7 @@ func (h *Hub) CloseUser(username string) error {
 	return nil
 }
 
-func (h *Hub) pumpUser(username string) error {
+func (h *Hub) pumpFromUser(username string) error {
 	conn, _ := h.connections.Get(username)
 	if conn == nil {
 		return fmt.Errorf(`user conn "%s" not found`, username)
