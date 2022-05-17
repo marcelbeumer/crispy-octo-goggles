@@ -3,6 +3,7 @@ package test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,12 @@ func ChTimeout[T any](t *testing.T, ch <-chan T) (T, error) {
 // GoTimeout runs passed function in a go routine and returns
 // ErrTimeout when the function timed out
 func GoTimeout(t *testing.T, fn func() error) error {
+	return GoTimeoutDur(t, fn, TimeoutDefault)
+}
+
+// GoTimeoutDur runs passed function in a go routine and returns
+// ErrTimeout when the function timed out
+func GoTimeoutDur(t *testing.T, fn func() error, dur time.Duration) error {
 	result := make(chan error)
 	go func() {
 		defer close(result)
@@ -38,7 +45,7 @@ func GoTimeout(t *testing.T, fn func() error) error {
 	select {
 	case err := <-result:
 		return err
-	case <-time.After(TimeoutDefault):
+	case <-time.After(dur):
 		return ErrTimeout
 	}
 }
@@ -62,4 +69,23 @@ func (g *ErrGroup) WaitTimeout(t *testing.T) error {
 	case <-time.After(TimeoutDefault):
 		return ErrTimeout
 	}
+}
+
+type Log struct {
+	l     sync.RWMutex
+	items []string
+}
+
+func (l *Log) Add(msg string) {
+	l.l.Lock()
+	l.items = append(l.items, msg)
+	l.l.Unlock()
+}
+
+func (l *Log) Items() []string {
+	var result []string
+	l.l.RLock()
+	result = l.items[:]
+	l.l.RUnlock()
+	return result
 }

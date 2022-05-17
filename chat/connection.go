@@ -74,6 +74,10 @@ func (c *TestConnection) Close() error {
 	return nil
 }
 
+func (c *TestConnection) WaitClosed() {
+	<-c.closed
+}
+
 // NewTestConnection creates a TestConnection using the passed in/out channels.
 func NewTestConnection(
 	eventInCh <-chan Event,

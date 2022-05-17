@@ -68,6 +68,8 @@ func (f *StdoutFrontend) pumpEvents(stop <-chan struct{}) error {
 			}
 
 			switch t := e.(type) {
+			case *EventConnected:
+				//
 			case *EventUserListUpdate:
 				//
 			case *EventUserEnter:

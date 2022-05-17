@@ -33,6 +33,10 @@ func NewEventMetaNow() *EventMeta {
 	}
 }
 
+type EventConnected struct {
+	EventMeta
+}
+
 type EventUserListUpdate struct {
 	EventMeta
 	Users []string `json:"users"`

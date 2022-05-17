@@ -22,8 +22,9 @@ func (h *Hub) ConnectUser(
 	}
 
 	h.connections.Set(username, conn)
-	done := make(chan struct{})
-	defer close(done)
+
+	// Shoot and forget
+	go h.sendEvent(username, &EventConnected{})
 
 	// Shoot and forget
 	go h.broadcastEvent(&EventUserEnter{
@@ -82,6 +83,7 @@ func (h *Hub) pumpUser(username string) error {
 func (h *Hub) handleEvent(username string, e Event) error {
 	logger := h.logger
 	switch t := e.(type) {
+	case *EventConnected:
 	case *EventUserListUpdate:
 	case *EventUserEnter:
 	case *EventUserLeave:
@@ -124,6 +126,7 @@ func (h *Hub) sendEvent(username string, e Event) error {
 	if !ok {
 		return fmt.Errorf(`unknown user conn "%s"`, username)
 	}
+	println("send event to user", username)
 	if err := conn.SendEvent(e); err != nil {
 		h.CloseUser(username) // unforgiving
 		return err

@@ -105,6 +105,8 @@ func (f *GUIFrontend) eventPump(stop <-chan struct{}) error {
 			}
 
 			switch t := e.(type) {
+			case *EventConnected:
+				//
 			case *EventUserListUpdate:
 				if err := f.setUsers(t.Users); err != nil {
 					return err
