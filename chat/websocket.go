@@ -14,6 +14,7 @@ import (
 )
 
 var websocketHandlers = map[string]func() Event{
+	"connected":      func() Event { return &EventConnected{} },
 	"userListUpdate": func() Event { return &EventUserListUpdate{} },
 	"userEnter":      func() Event { return &EventUserEnter{} },
 	"userLeave":      func() Event { return &EventUserLeave{} },

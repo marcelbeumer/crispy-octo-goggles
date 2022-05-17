@@ -5,72 +5,95 @@ import (
 	"reflect"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
-	"golang.org/x/sync/errgroup"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/safe"
 )
 
+type HubUser struct {
+	conn   Connection
+	events *safe.Queue[Event]
+}
+
 type Hub struct {
-	logger      log.Logger
-	connections *SafeMap[Connection]
+	logger log.Logger
+	users  *safe.Map[*HubUser]
 }
 
 func (h *Hub) ConnectUser(
 	username string,
 	conn Connection,
 ) error {
-	if _, ok := h.connections.Get(username); ok {
+	if _, ok := h.users.Get(username); ok {
 		return fmt.Errorf("user \"%s\" already exists", username)
 	}
 
-	h.connections.Set(username, conn)
+	user := HubUser{conn: conn, events: safe.NewQueue[Event]()}
+	h.users.Set(username, &user)
 
-	// Shoot and forget
-	go h.sendEvent(username, &EventConnected{})
-
-	// Shoot and forget
-	go h.broadcastEvent(&EventUserEnter{
+	h.scheduleEvent(username, &EventConnected{})
+	h.scheduleBroadcast(&EventUserEnter{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
 	}, username)
-
-	// Shoot and forget
-	go h.broadcastEvent(&EventUserListUpdate{
+	h.scheduleBroadcast(&EventUserListUpdate{
 		EventMeta: *NewEventMetaNow(),
-		Users:     h.connections.Keys(),
+		Users:     h.users.Keys(),
 	})
 
-	if err := h.pumpFromUser(username); err != nil {
-		h.CloseUser(username)
-		return err
+	var err error
+	select {
+	case err = <-fnCh(func() error { return h.pumpFromUser(username) }):
+	case err = <-fnCh(func() error { return h.pumpToUser(username) }):
 	}
+
+	if err != nil {
+		h.CloseUser(username)
+	}
+
 	return nil
 }
 
 func (h *Hub) CloseUser(username string) error {
-	conn, _ := h.connections.Get(username)
-	if conn != nil && !conn.Closed() {
-		conn.Close()
+	user, _ := h.users.Get(username)
+	if user != nil && !user.conn.Closed() {
+		user.conn.Close()
+		user.events.Close()
 	}
-	_ = h.connections.Remove(username)
-	// Shoot and forget
-	go h.broadcastEvent(&EventUserLeave{
+	_ = h.users.Remove(username)
+	h.scheduleBroadcast(&EventUserLeave{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
 	})
-	// Shoot and forget
-	go h.broadcastEvent(&EventUserListUpdate{
+	h.scheduleBroadcast(&EventUserListUpdate{
 		EventMeta: *NewEventMetaNow(),
-		Users:     h.connections.Keys(),
+		Users:     h.users.Keys(),
 	})
 	return nil
 }
 
-func (h *Hub) pumpFromUser(username string) error {
-	conn, _ := h.connections.Get(username)
-	if conn == nil {
+func (h *Hub) pumpToUser(username string) error {
+	user, _ := h.users.Get(username)
+	if user == nil {
 		return fmt.Errorf(`user conn "%s" not found`, username)
 	}
 	for {
-		e, err := conn.ReadEvent()
+		e, err := user.events.Read()
+		if err != nil {
+			return err
+		}
+		err = user.conn.SendEvent(e)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func (h *Hub) pumpFromUser(username string) error {
+	user, _ := h.users.Get(username)
+	if user == nil {
+		return fmt.Errorf(`user conn "%s" not found`, username)
+	}
+	for {
+		e, err := user.conn.ReadEvent()
 		if err != nil {
 			return err
 		}
@@ -89,7 +112,7 @@ func (h *Hub) handleEvent(username string, e Event) error {
 	case *EventUserLeave:
 	case *EventSendMessage:
 		// Shoot and forget
-		go h.broadcastEvent(&EventNewMessage{
+		go h.scheduleBroadcast(&EventNewMessage{
 			EventMeta: *NewEventMetaNow(),
 			Sender:    username,
 			Message:   t.Message,
@@ -104,30 +127,28 @@ func (h *Hub) handleEvent(username string, e Event) error {
 	return nil
 }
 
-func (h *Hub) broadcastEvent(e Event, exceptUsers ...string) error {
+func (h *Hub) scheduleBroadcast(e Event, exceptUsers ...string) error {
 	except := map[string]bool{}
 	for _, n := range exceptUsers {
 		except[n] = true
 	}
-	eg := errgroup.Group{}
-	for _, username := range h.connections.Keys() {
+	for _, username := range h.users.Keys() {
 		if !except[username] {
-			username := username
-			eg.Go(func() error {
-				return h.sendEvent(username, e)
-			})
+			err := h.scheduleEvent(username, e)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	return eg.Wait()
+	return nil
 }
 
-func (h *Hub) sendEvent(username string, e Event) error {
-	conn, ok := h.connections.Get(username)
+func (h *Hub) scheduleEvent(username string, e Event) error {
+	user, ok := h.users.Get(username)
 	if !ok {
 		return fmt.Errorf(`unknown user conn "%s"`, username)
 	}
-	println("send event to user", username)
-	if err := conn.SendEvent(e); err != nil {
+	if err := user.events.Add(e); err != nil {
 		h.CloseUser(username) // unforgiving
 		return err
 	}
@@ -136,7 +157,7 @@ func (h *Hub) sendEvent(username string, e Event) error {
 
 func NewHub(logger log.Logger) *Hub {
 	return &Hub{
-		logger:      logger,
-		connections: NewSafeMap[Connection](),
+		logger: logger,
+		users:  safe.NewMap[*HubUser](),
 	}
 }
