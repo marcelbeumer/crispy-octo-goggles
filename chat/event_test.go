@@ -18,57 +18,57 @@ func TestEventMetaWhen(t *testing.T) {
 
 func TestNewEventMetaNow(t *testing.T) {
 	oldNow := now
-	nowTime := time.Now()
+	fixedTime := time.UnixMilli(2000)
 	now = func() time.Time {
-		return nowTime
+		return fixedTime
 	}
 	t.Cleanup(func() {
 		now = oldNow
 	})
 	m := NewEventMetaNow()
-	assert.Equal(t, nowTime, m.Time)
+	assert.Equal(t, fixedTime, m.Time)
 }
 
 func TestEventUserListUpdateJSON(t *testing.T) {
 	e := EventUserListUpdate{
-		EventMeta: EventMeta{Time: time.Time{}},
+		EventMeta: EventMeta{Time: time.UnixMilli(1000)},
 		Users:     []string{"u1", "u2"},
 	}
 	json, err := json.Marshal(&e)
 	require.NoError(t, err)
-	expected := `{"time":"0001-01-01T00:00:00Z","users":["u1","u2"]}`
+	expected := `{"time":"1970-01-01T01:00:01+01:00","users":["u1","u2"]}`
 	assert.Equal(t, expected, string(json))
 }
 
 func TestEventUserEnterJSON(t *testing.T) {
 	e := EventUserEnter{
-		EventMeta: EventMeta{Time: time.Time{}},
+		EventMeta: EventMeta{Time: time.UnixMilli(1000)},
 		Name:      "u1",
 	}
 	json, err := json.Marshal(&e)
 	require.NoError(t, err)
-	expected := `{"time":"0001-01-01T00:00:00Z","name":"u1"}`
+	expected := `{"time":"1970-01-01T01:00:01+01:00","name":"u1"}`
 	assert.Equal(t, expected, string(json))
 }
 
 func TestEventUserLeaveJSON(t *testing.T) {
 	e := EventUserLeave{
-		EventMeta: EventMeta{Time: time.Time{}},
+		EventMeta: EventMeta{Time: time.UnixMilli(1000)},
 		Name:      "u1",
 	}
 	json, err := json.Marshal(&e)
 	require.NoError(t, err)
-	expected := `{"time":"0001-01-01T00:00:00Z","name":"u1"}`
+	expected := `{"time":"1970-01-01T01:00:01+01:00","name":"u1"}`
 	assert.Equal(t, expected, string(json))
 }
 
 func TestEventSendMessageJSON(t *testing.T) {
 	e := EventSendMessage{
-		EventMeta: EventMeta{Time: time.Time{}},
+		EventMeta: EventMeta{Time: time.UnixMilli(1000)},
 		Message:   "Hello.",
 	}
 	json, err := json.Marshal(&e)
 	require.NoError(t, err)
-	expected := `{"time":"0001-01-01T00:00:00Z","message":"Hello."}`
+	expected := `{"time":"1970-01-01T01:00:01+01:00","message":"Hello."}`
 	assert.Equal(t, expected, string(json))
 }
