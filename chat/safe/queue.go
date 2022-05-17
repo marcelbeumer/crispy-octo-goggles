@@ -19,26 +19,28 @@ type Queue[T any] struct {
 // Add adds items to the queue.
 // Returns error if queue is closed
 func (q *Queue[T]) Add(e T) error {
+	q.l.Lock()
+	defer q.l.Unlock()
+
 	select {
 	case <-q.closed:
 		return ErrQueueClosed
 	default:
 	}
 
-	q.l.Lock()
 	q.items = append(q.items, e)
 
-	// FIXME: waiting for the go routine to start to unlock seems
-	// not right (slow)
-	if len(q.wait) == 0 {
-		go func() {
-			q.l.Unlock()
-			q.wait <- struct{}{}
-		}()
-		return nil
+	if q.wait != nil {
+		wait := q.wait
+		q.wait = nil
+
+		select {
+		case <-wait:
+		default:
+			close(wait)
+		}
 	}
 
-	q.l.Unlock()
 	return nil
 }
 
@@ -61,13 +63,24 @@ func (q *Queue[T]) Close() {
 // Returns ErrQueueClosed when queue is closed.
 func (q *Queue[T]) Read() (T, error) {
 	for {
-		lastEvent, err := q.getLast()
-		if err == nil {
-			return lastEvent, nil
+		q.l.Lock()
+		if len(q.items) > 0 {
+			end := len(q.items) - 1
+			event := q.items[end]
+			q.items = q.items[:end]
+			q.l.Unlock()
+			return event, nil
 		}
 
+		if q.wait == nil {
+			q.wait = make(chan struct{})
+		}
+
+		wait := q.wait
+		q.l.Unlock()
+
 		select {
-		case <-q.wait:
+		case <-wait:
 		case <-q.closed:
 			var zero T
 			return zero, ErrQueueClosed
@@ -75,24 +88,11 @@ func (q *Queue[T]) Read() (T, error) {
 	}
 }
 
-func (q *Queue[T]) getLast() (T, error) {
-	q.l.Lock()
-	defer q.l.Unlock()
-	if len(q.items) > 0 {
-		end := len(q.items) - 1
-		event := q.items[end]
-		q.items = q.items[:end]
-		return event, nil
-	}
-	var empty T
-	return empty, ErrQueueNoItem
-}
-
 func NewQueue[T any]() *Queue[T] {
 	return &Queue[T]{
 		items:  []T{},
 		l:      sync.RWMutex{},
-		wait:   make(chan struct{}, 1),
+		wait:   make(chan struct{}),
 		closed: make(chan struct{}),
 	}
 }
