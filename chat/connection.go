@@ -2,7 +2,6 @@ package chat
 
 import (
 	"errors"
-	"io"
 )
 
 // Connection is the interface that describes the connection between
@@ -13,7 +12,7 @@ type Connection interface {
 	// Returns error when sending failed.
 	SendEvent(e Event) error
 	// ReceiveEvent wait for next Event. Error when reading fails.
-	// Returns error io.EOF when connection closed.
+	// Returns error ErrConnectionClosed when connection closed.
 	ReadEvent() (Event, error)
 	// Closed return chan that is closed when connection is closed.
 	Closed() bool
@@ -51,7 +50,7 @@ func (c *TestConnection) SendEvent(e Event) error {
 func (c *TestConnection) ReadEvent() (Event, error) {
 	select {
 	case <-c.closed:
-		return nil, io.EOF
+		return nil, ErrConnectionClosed
 	case e := <-c.EventInCh:
 		return e, nil
 	}
@@ -76,7 +75,10 @@ func (c *TestConnection) Close() error {
 }
 
 // NewTestConnection creates a TestConnection using the passed in/out channels.
-func NewTestConnection(eventInCh <-chan Event, eventOutCh chan<- Event) *TestConnection {
+func NewTestConnection(
+	eventInCh <-chan Event,
+	eventOutCh chan<- Event,
+) *TestConnection {
 	return &TestConnection{
 		EventInCh:  eventInCh,
 		EventOutCh: eventOutCh,

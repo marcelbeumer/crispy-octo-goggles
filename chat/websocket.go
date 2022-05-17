@@ -2,8 +2,8 @@ package chat
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -106,7 +106,7 @@ func (c *WebsocketConnection) SendEvent(e Event) error {
 func (c *WebsocketConnection) ReadEvent() (Event, error) {
 	select {
 	case <-c.closed:
-		return nil, io.EOF
+		return nil, ErrConnectionClosed
 	case e := <-c.eventOutCh:
 		return e, nil
 	}
@@ -149,7 +149,7 @@ func (c *WebsocketConnection) wsReadPump() error {
 			}
 			select {
 			case <-c.closed:
-				return io.EOF
+				return ErrConnectionClosed
 			case c.eventOutCh <- m.Data:
 				//
 			}
@@ -170,8 +170,8 @@ func NewWebsocketConnection(
 	go func() {
 		defer conn.Close()
 		err := conn.wsReadPump()
-		if err == io.EOF {
-			logger.Infow("websocket pump closed (EOF)")
+		if errors.Is(err, ErrConnectionClosed) {
+			logger.Infow("websocket pump closed")
 		} else {
 			logger.Errorw("websocket pump error", log.Error(err))
 		}

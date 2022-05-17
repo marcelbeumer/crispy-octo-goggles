@@ -2,44 +2,64 @@
 package test
 
 import (
+	"errors"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // TimeoutDefault is the default timeout duration.
 var TimeoutDefault = time.Second
 
-// FatalTimeout calls t.Fatal with standard log message.
-// Can not be run in a go routine.
-func FatalTimeout(t *testing.T) {
-	t.Fatal("timeout")
-}
+// ErrTimeout is the error that is returned when something timed out
+var ErrTimeout = errors.New("timeout")
 
-// ChTimeout wraps passed channel and either returns the next value of the
-// channel or does a t.Fatal returning the empty value of the channel when
-// the channel takes too long. Can not be run in a go routine.
-func ChTimeout[T any](t *testing.T, ch <-chan T) T {
+// ChTimeout either returns value from passed channel or zero value
+// of the channel and ErrTimeout
+func ChTimeout[T any](t *testing.T, ch <-chan T) (T, error) {
 	select {
 	case r := <-ch:
-		return r
+		return r, nil
 	case <-time.After(TimeoutDefault):
-		FatalTimeout(t)
 		var empty T
-		return empty
+		return empty, ErrTimeout
 	}
 }
 
-// GoTimeout runs passed function in a go routine and does a t.Fatal when
-// the go routine takes too long. Can not be run in a go routine.
-func GoTimeout(t *testing.T, fn func()) {
-	done := make(chan struct{})
+// GoTimeout runs passed function in a go routine and returns
+// ErrTimeout when the function timed out
+func GoTimeout(t *testing.T, fn func() error) error {
+	result := make(chan error)
 	go func() {
-		defer close(done)
-		fn()
+		defer close(result)
+		result <- fn()
 	}()
 	select {
-	case <-done:
+	case err := <-result:
+		return err
 	case <-time.After(TimeoutDefault):
-		FatalTimeout(t)
+		return ErrTimeout
+	}
+}
+
+// ErrGroup is golang.org/x/sync/errgroup:ErrGroup with extra method(s)
+type ErrGroup struct {
+	errgroup.Group
+}
+
+// WaitTimeout waits for the group to finish or error or timeout.
+// Returns ErrTimeout on timeout.
+func (g *ErrGroup) WaitTimeout(t *testing.T) error {
+	result := make(chan error)
+	go func() {
+		defer close(result)
+		result <- g.Wait()
+	}()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(TimeoutDefault):
+		return ErrTimeout
 	}
 }

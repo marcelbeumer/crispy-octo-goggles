@@ -5,6 +5,7 @@ import (
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func skip_TestFnChRunsPassedFnInGoroutine(t *testing.T) {
@@ -22,7 +23,9 @@ func TestFnChReturnsFnResultInChannel(t *testing.T) {
 	fn := func() int { return expected }
 	ch := fnCh(fn)
 
-	result := test.ChTimeout(t, ch)
+	result, err := test.ChTimeout(t, ch)
+	require.NoError(t, err)
+
 	assert.Equal(t, expected, result)
 }
 
@@ -30,6 +33,11 @@ func TestFnChClosesReturnCh(t *testing.T) {
 	fn := func() int { return 1 }
 	ch := fnCh(fn)
 
-	assert.Equal(t, 1, test.ChTimeout(t, ch))
-	assert.Equal(t, 0, test.ChTimeout(t, ch)) // closed zero value
+	v1, err := test.ChTimeout(t, ch)
+	require.NoError(t, err)
+	assert.Equal(t, 1, v1)
+
+	v2, err := test.ChTimeout(t, ch)
+	require.NoError(t, err)
+	assert.Equal(t, 0, v2) // closed zero value
 }
