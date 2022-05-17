@@ -28,6 +28,8 @@ func (q *Queue[T]) Add(e T) error {
 	q.l.Lock()
 	q.items = append(q.items, e)
 
+	// FIXME: waiting for the go routine to start to unlock seems
+	// not right (slow)
 	if len(q.wait) == 0 {
 		go func() {
 			q.l.Unlock()
