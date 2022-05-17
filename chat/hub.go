@@ -8,14 +8,18 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/safe"
 )
 
-type HubUser struct {
-	conn   Connection
+// hubUser encapsulates a user in the hub.
+type hubUser struct {
+	conn Connection
+	// Events are put in a queue for sending. This allows back pressure control
+	// but this is not yet implemented.
 	events *safe.Queue[Event]
 }
 
+// Hub is the chat hub/room where users can connect to.
 type Hub struct {
 	logger log.Logger
-	users  *safe.Map[*HubUser]
+	users  *safe.Map[*hubUser]
 }
 
 func (h *Hub) ConnectUser(
@@ -26,7 +30,7 @@ func (h *Hub) ConnectUser(
 		return fmt.Errorf("user \"%s\" already exists", username)
 	}
 
-	user := HubUser{conn: conn, events: safe.NewQueue[Event]()}
+	user := hubUser{conn: conn, events: safe.NewQueue[Event]()}
 	h.users.Set(username, &user)
 
 	h.scheduleEvent(username, &EventConnected{})
@@ -158,6 +162,6 @@ func (h *Hub) scheduleEvent(username string, e Event) error {
 func NewHub(logger log.Logger) *Hub {
 	return &Hub{
 		logger: logger,
-		users:  safe.NewMap[*HubUser](),
+		users:  safe.NewMap[*hubUser](),
 	}
 }
