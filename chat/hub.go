@@ -32,12 +32,19 @@ func (h *Hub) ConnectUser(
 
 	user := hubUser{conn: conn, events: safe.NewQueue[Event]()}
 	h.users.Set(username, &user)
+	defer h.CloseUser(username)
 
-	h.scheduleEvent(username, &EventConnected{})
+	if err := h.scheduleEvent(username, &EventConnected{
+		EventMeta: *NewEventMetaNow(),
+	}); err != nil {
+		return err
+	}
+
 	h.scheduleBroadcast(&EventUserEnter{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
 	}, username)
+
 	h.scheduleBroadcast(&EventUserListUpdate{
 		EventMeta: *NewEventMetaNow(),
 		Users:     h.users.Keys(),
@@ -49,11 +56,7 @@ func (h *Hub) ConnectUser(
 	case err = <-fnCh(func() error { return h.pumpToUser(username) }):
 	}
 
-	if err != nil {
-		h.CloseUser(username)
-	}
-
-	return nil
+	return err
 }
 
 func (h *Hub) CloseUser(username string) error {

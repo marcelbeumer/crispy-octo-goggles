@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/now"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,16 +18,13 @@ func TestEventMetaWhen(t *testing.T) {
 }
 
 func TestNewEventMetaNow(t *testing.T) {
-	oldNow := now
-	fixedTime := time.UnixMilli(2000)
-	now = func() time.Time {
-		return fixedTime
-	}
+	now.EnableStub()
+	now.ResetStub()
 	t.Cleanup(func() {
-		now = oldNow
+		now.DisableStub()
 	})
 	m := NewEventMetaNow()
-	assert.Equal(t, fixedTime, m.Time)
+	assert.Equal(t, now.CurrStub().Time, m.Time)
 }
 
 func TestEventUserListUpdateJSON(t *testing.T) {

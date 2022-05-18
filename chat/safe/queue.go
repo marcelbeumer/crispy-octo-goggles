@@ -65,9 +65,8 @@ func (q *Queue[T]) Read() (T, error) {
 	for {
 		q.l.Lock()
 		if len(q.items) > 0 {
-			end := len(q.items) - 1
-			event := q.items[end]
-			q.items = q.items[:end]
+			event := q.items[0]
+			q.items = q.items[1:]
 			q.l.Unlock()
 			return event, nil
 		}

@@ -1,11 +1,10 @@
 package chat
 
-import "time"
+import (
+	"time"
 
-// now can be overridden in tests
-var now = func() time.Time {
-	return time.Now()
-}
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/now"
+)
 
 // Event is the interface for all events
 type Event interface {
@@ -29,7 +28,7 @@ func (e *EventMeta) When() time.Time {
 // NewEventMetaNow returns EventMeta with time set to "now".
 func NewEventMetaNow() *EventMeta {
 	return &EventMeta{
-		Time: now(),
+		Time: now.Now(),
 	}
 }
 

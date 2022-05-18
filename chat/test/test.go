@@ -11,7 +11,7 @@ import (
 )
 
 // TimeoutDefault is the default timeout duration.
-var TimeoutDefault = time.Second
+var TimeoutDefault = time.Second * 5
 
 // ErrTimeout is the error that is returned when something timed out
 var ErrTimeout = errors.New("timeout")
