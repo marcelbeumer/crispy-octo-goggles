@@ -1,166 +1,86 @@
 package chat
 
 import (
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/now"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/test"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/now"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var logger log.NoopLoggerAdapter
 
-type EventLogger struct {
-	l     sync.RWMutex
-	items map[string][]Event
-}
-
-func (l *EventLogger) Log(username string, event Event) {
-	l.l.Lock()
-	defer l.l.Unlock()
-	if l.items == nil {
-		l.items = make(map[string][]Event)
-	}
-	lg := l.items[username]
-	lg = append(lg, event)
-	l.items[username] = lg
-}
-
-func (l *EventLogger) Get(username string) []Event {
-	l.l.RLock()
-	defer l.l.RUnlock()
-	return l.items[username]
-}
-
-func TestHubConnectUserUntilClosed(t *testing.T) {
-	hub := NewHub(&logger)
-	conn := TestConnection{
-		EventOutCh: make(chan<- Event),
-		EventInCh:  make(<-chan Event),
-		closed:     make(chan struct{}),
-	}
-
-	g := test.ErrGroup{}
-	g.Go(func() error {
-		return hub.ConnectUser("user", &conn)
-	})
-
-	conn.Close()
-	err := g.WaitTimeout(t)
-
-	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrConnectionClosed)
-}
-
 func TestHubConnectUserEvents(t *testing.T) {
-	t.Skip("BROKEN")
-
 	now.EnableStub()
 	now.ResetStub()
-
-	nowStub := now.CurrStub()
-	// Manage time in this test: less realistic but less brittle
-	nowStub.Frozen = true
-	startTime := nowStub.Time
-
 	t.Cleanup(func() {
 		now.DisableStub()
 	})
 
+	nowStub := now.CurrStub()
+	nowStub.Frozen = true // less brittle
+	startTime := nowStub.Time
+
 	hub := NewHub(&logger)
 
-	toUser1 := make(chan Event)
-	hubConnUser1 := TestConnection{
-		EventOutCh: toUser1,
-		EventInCh:  make(<-chan Event),
-		closed:     make(chan struct{}),
-	}
+	user1Ch := make(chan Event)
+	user2Ch := make(chan Event)
+	user1Conn := NewTestConnection(make(chan Event), user1Ch)
+	user2Conn := NewTestConnection(make(chan Event), user2Ch)
+	user1Events := []Event{}
+	user2Events := []Event{}
 
-	toUser2 := make(chan Event)
-	hubConnUser2 := TestConnection{
-		EventOutCh: toUser2,
-		EventInCh:  make(<-chan Event),
-		closed:     make(chan struct{}),
-	}
+	var user1Id hubId
+	var user2Id hubId
+	var g test.ErrGroup
 
-	// channels to mark points-in-time
-	user1Connected := make(chan struct{})
-	user1Closed := make(chan struct{})
-	user2Closed := make(chan struct{})
-
-	events := EventLogger{}
-	g := test.ErrGroup{}
+	didUser1Connect := make(chan struct{})
+	canDisconnect := make(chan struct{})
+	done := make(chan struct{})
 
 	g.Go(func() error {
-		hub.ConnectUser("user1", &hubConnUser1)
-		return nil
+		id, err := hub.Connect("user1", user1Conn)
+		user1Id = id
+		<-didUser1Connect
+		id, err = hub.Connect("user2", user2Conn)
+		user2Id = id
+		return err
 	})
 
 	g.Go(func() error {
-		<-user1Connected
-		hub.ConnectUser("user2", &hubConnUser2)
-		return nil
-	})
-
-	g.Go(func() error {
-		hubConnUser1.WaitClosed()
-		close(user1Closed)
-		return nil
-	})
-
-	g.Go(func() error {
-		time.Sleep(time.Second / 2)
-		return hubConnUser1.Close()
-	})
-
-	g.Go(func() error {
-		hubConnUser2.WaitClosed()
-		close(user2Closed)
-		return nil
-	})
-
-	g.Go(func() error {
-		for {
-			select {
-			case <-user1Closed:
-				return nil
-			case e := <-toUser1:
-				// nowStub.Inc()
-				events.Log("user1", e)
-				switch e.(type) {
-				case *EventConnected:
-					close(user1Connected)
-				}
-			}
+		<-canDisconnect
+		defer close(done)
+		if err := hub.Disconnect(user1Id); err != nil {
+			return err
 		}
+		if err := hub.Disconnect(user2Id); err != nil {
+			return err
+		}
+		return nil
 	})
 
 	g.Go(func() error {
 		for {
 			select {
-			case <-user2Closed:
+			case <-done:
 				return nil
-			case e := <-toUser2:
-				// nowStub.Inc()
-				events.Log("user2", e)
+			case e := <-user1Ch:
+				user1Events = append(user1Events, e)
 				switch e.(type) {
 				case *EventConnected:
-					go (func() {
-						time.Sleep(time.Second * 2)
-						hubConnUser1.Close()
-						hubConnUser2.Close()
-					})()
+					close(didUser1Connect)
+				case *EventUserListUpdate:
+					close(canDisconnect)
 				}
+			case e := <-user2Ch:
+				user2Events = append(user2Events, e)
 			}
 		}
 	})
 
 	err := g.WaitTimeout(t)
-
 	require.NoError(t, err)
 
 	expectedUser1 := []Event{
@@ -168,10 +88,7 @@ func TestHubConnectUserEvents(t *testing.T) {
 			EventMeta: EventMeta{
 				Time: startTime,
 			},
-		},
-		&EventUserListUpdate{
-			EventMeta: EventMeta{Time: startTime},
-			Users:     []string{"user1"},
+			Users: []string{"user1"},
 		},
 		&EventUserEnter{
 			EventMeta: EventMeta{Time: startTime},
@@ -188,13 +105,10 @@ func TestHubConnectUserEvents(t *testing.T) {
 			EventMeta: EventMeta{
 				Time: startTime,
 			},
-		},
-		&EventUserListUpdate{
-			EventMeta: EventMeta{Time: startTime},
-			Users:     []string{"user1", "user2"},
+			Users: []string{"user1", "user2"},
 		},
 	}
 
-	assert.Equal(t, expectedUser1, events.Get("user1"))
-	assert.Equal(t, expectedUser2, events.Get("user2"))
+	assert.Equal(t, expectedUser1, user1Events)
+	assert.Equal(t, expectedUser2, user2Events)
 }

@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"errors"
 )
 
@@ -11,14 +12,22 @@ type Connection interface {
 	// Returns ErrConnectionClosed when connection closed.
 	// Returns error when sending failed.
 	SendEvent(e Event) error
-	// ReceiveEvent wait for next Event. Error when reading fails.
+	// ReadEvent wiats for next Event. Error when reading fails.
 	// Returns error ErrConnectionClosed when connection closed.
 	ReadEvent() (Event, error)
+	// Wait waits until connection is closed.
+	// Returns error with which the connection was closed (or nil)
+	Wait() error
+	// WaitContext waits until connection is closed.
+	// Returns error with which the connection was closed (or nil)
+	WaitContext(ctx context.Context) error
+	// CLose closes connection, if connected.
+	// Blocks until disconnected.
+	Close(error) error
 	// Closed return chan that is closed when connection is closed.
 	Closed() bool
-	// Disconnect disconnects from the server, if connected.
-	// Blocks until disconnected.
-	Close() error
+	// Err returns the error with which the connection closed, or nil.
+	Err() error
 }
 
 // ErrConnectionClosed is the error returned when the connection is
@@ -35,6 +44,8 @@ type TestConnection struct {
 	// closed is the channel used for marking the connection as
 	// (permantently) closed.
 	closed chan struct{}
+	// error is the error the connection closed with
+	error error
 }
 
 func (c *TestConnection) SendEvent(e Event) error {
@@ -56,6 +67,31 @@ func (c *TestConnection) ReadEvent() (Event, error) {
 	}
 }
 
+func (c *TestConnection) Wait() error {
+	<-c.closed
+	return c.error
+}
+
+func (c *TestConnection) WaitContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.closed:
+	}
+	return c.error
+}
+
+func (c *TestConnection) Close(err error) error {
+	select {
+	case <-c.closed:
+		return ErrConnectionClosed
+	default:
+		c.error = err
+		close(c.closed)
+	}
+	return nil
+}
+
 func (c *TestConnection) Closed() bool {
 	select {
 	case <-c.closed:
@@ -65,17 +101,8 @@ func (c *TestConnection) Closed() bool {
 	}
 }
 
-func (c *TestConnection) Close() error {
-	select {
-	case <-c.closed:
-	default:
-		close(c.closed)
-	}
-	return nil
-}
-
-func (c *TestConnection) WaitClosed() {
-	<-c.closed
+func (c *TestConnection) Err() error {
+	return c.error
 }
 
 // NewTestConnection creates a TestConnection using the passed in/out channels.

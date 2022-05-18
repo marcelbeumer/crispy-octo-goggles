@@ -64,7 +64,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		defer conn.Close()
+		defer conn.Close(nil)
 
 		frontendErr := func(err error) {
 			logger.Error("frontend error", log.Error(err))

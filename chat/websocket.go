@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,6 +60,7 @@ type WebsocketConnection struct {
 	eventOutCh chan Event
 	l          sync.RWMutex
 	closed     chan struct{}
+	error      error
 }
 
 func (c *WebsocketConnection) SendEvent(e Event) error {
@@ -113,6 +115,32 @@ func (c *WebsocketConnection) ReadEvent() (Event, error) {
 	}
 }
 
+func (c *WebsocketConnection) Wait() error {
+	<-c.closed
+	return c.error
+}
+
+func (c *WebsocketConnection) WaitContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-c.closed:
+	}
+	return c.error
+}
+
+func (c *WebsocketConnection) Close(err error) error {
+	select {
+	case <-c.closed:
+		return ErrConnectionClosed
+	default:
+		c.error = err
+		close(c.closed)
+		return c.wsConn.Close()
+	}
+	return nil
+}
+
 func (c *WebsocketConnection) Closed() bool {
 	select {
 	case <-c.closed:
@@ -122,14 +150,8 @@ func (c *WebsocketConnection) Closed() bool {
 	}
 }
 
-func (c *WebsocketConnection) Close() error {
-	select {
-	case <-c.closed:
-	default:
-		close(c.closed)
-		return c.wsConn.Close()
-	}
-	return nil
+func (c *WebsocketConnection) Err() error {
+	return c.error
 }
 
 func (c *WebsocketConnection) wsReadPump() error {
@@ -169,7 +191,7 @@ func NewWebsocketConnection(
 		closed:     make(chan struct{}),
 	}
 	go func() {
-		defer conn.Close()
+		defer conn.Close(nil)
 		err := conn.wsReadPump()
 		if errors.Is(err, ErrConnectionClosed) {
 			logger.Infow("websocket pump closed")
@@ -229,9 +251,18 @@ func (s *WebsocketServer) handleHttp(w http.ResponseWriter, r *http.Request) {
 
 	logger.Infow("new websocket connection")
 	conn := NewWebsocketConnection(wsConn, logger)
-	defer conn.Close()
+	userId, err := s.hub.Connect(username, conn)
+	if err != nil {
+		logger.Errorw(
+			"could not connect to hub",
+			log.Error(err),
+		)
+	}
 
-	if err := s.hub.ConnectUser(username, conn); err != nil {
+	defer conn.Close(nil)
+	defer s.hub.Disconnect(userId)
+
+	if err := conn.Wait(); err != nil {
 		logger.Errorw(
 			"user disconnected with error",
 			log.Error(err),

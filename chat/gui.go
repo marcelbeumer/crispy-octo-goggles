@@ -8,6 +8,7 @@ import (
 
 	"github.com/awesome-gocui/gocui"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/channel"
 )
 
 type GUIFrontend struct {
@@ -75,8 +76,8 @@ func (f *GUIFrontend) Start() error {
 	})
 
 	select {
-	case err = <-fnCh(func() error { return f.guiPump() }):
-	case err = <-fnCh(func() error {
+	case err = <-channel.FnChan(func() error { return f.guiPump() }):
+	case err = <-channel.FnChan(func() error {
 		<-layoutReady
 		return f.eventPump(stop)
 	}):
@@ -106,7 +107,9 @@ func (f *GUIFrontend) eventPump(stop <-chan struct{}) error {
 
 			switch t := e.(type) {
 			case *EventConnected:
-				//
+				if err := f.setUsers(t.Users); err != nil {
+					return err
+				}
 			case *EventUserListUpdate:
 				if err := f.setUsers(t.Users); err != nil {
 					return err
