@@ -149,8 +149,11 @@ func TestHubConnectUserEvents(t *testing.T) {
 				events.Log("user2", e)
 				switch e.(type) {
 				case *EventConnected:
-					hubConnUser1.Close()
-					hubConnUser2.Close()
+					go (func() {
+						time.Sleep(time.Second * 2)
+						hubConnUser1.Close()
+						hubConnUser2.Close()
+					})()
 				}
 			}
 		}
