@@ -62,7 +62,7 @@ func (h *Hub) CloseUser(username string) error {
 		user.conn.Close()
 		user.events.Close()
 	}
-	_ = h.users.Remove(username)
+	_ = h.users.Delete(username)
 	h.scheduleBroadcast(&EventUserLeave{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
