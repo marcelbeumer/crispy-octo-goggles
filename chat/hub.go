@@ -52,23 +52,28 @@ func (h *Hub) Disconnect(userId hubId) error {
 	return h.disconnectUser(userId, nil, true)
 }
 
-func (h *Hub) DisconnectAll() error {
-	var wg sync.WaitGroup
-	var wgErr error
+func (h *Hub) DisconnectAll() <-chan error {
+	errCh := make(chan error)
 
-	for _, v := range h.userIds() {
-		userId := v
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := h.disconnectUser(userId, nil, false); err != nil {
-				wgErr = err
-			}
-		}()
-	}
+	go func() {
+		defer close(errCh)
+		var wg sync.WaitGroup
 
-	wg.Wait()
-	return wgErr
+		for _, v := range h.userIds() {
+			userId := v
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := h.disconnectUser(userId, nil, false); err != nil {
+					errCh <- err
+				}
+			}()
+		}
+
+		wg.Wait()
+	}()
+
+	return errCh
 }
 
 func (h *Hub) genId() hubId {
