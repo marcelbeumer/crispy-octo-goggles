@@ -27,7 +27,7 @@ func NewStub() *Stub {
 }
 
 var stub = NewStub()
-var stubLock sync.Mutex
+var stubLock sync.Mutex // for concurrent tests
 var useStub = false
 
 func EnableStub() {

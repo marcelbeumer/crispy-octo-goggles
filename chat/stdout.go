@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/channel"
 )
 
 type StdoutFrontend struct {
@@ -20,8 +21,8 @@ func (f *StdoutFrontend) Start() error {
 	defer close(stop)
 	var err error
 	select {
-	case err = <-fnCh(func() error { return f.pumpEvents(stop) }):
-	case err = <-fnCh(func() error { return f.pumpStdin(stop) }):
+	case err = <-channel.FnChan(func() error { return f.pumpEvents(stop) }):
+	case err = <-channel.FnChan(func() error { return f.pumpStdin(stop) }):
 	}
 	return err
 }

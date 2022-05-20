@@ -3,7 +3,7 @@ package chat
 import (
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/now"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/now"
 )
 
 // Event is the interface for all events
@@ -32,8 +32,11 @@ func NewEventMetaNow() *EventMeta {
 	}
 }
 
+// EventConnected is (guaranteed) the first event sent when
+// a new connection is made
 type EventConnected struct {
 	EventMeta
+	Users []string `json:"users"`
 }
 
 type EventUserListUpdate struct {

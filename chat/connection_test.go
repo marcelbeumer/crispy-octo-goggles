@@ -1,10 +1,11 @@
 package chat
 
 import (
+	"errors"
 	"testing"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/test"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +86,7 @@ func TestTestConnectionSendEventClosed(t *testing.T) {
 		EventInCh:  make(<-chan Event),
 		closed:     make(chan struct{}),
 	}
-	err := c.Close()
+	err := c.Close(nil)
 	require.NoError(t, err)
 
 	err = test.GoTimeout(t, func() error {
@@ -132,7 +133,7 @@ func TestTestConnectionReadEventClosed(t *testing.T) {
 		EventInCh:  make(<-chan Event),
 		closed:     make(chan struct{}),
 	}
-	err := c.Close()
+	err := c.Close(nil)
 	require.NoError(t, err)
 	err = test.GoTimeout(t, func() error {
 		_, err := c.ReadEvent()
@@ -159,37 +160,35 @@ func TestTestConnectionClosed(t *testing.T) {
 	assert.Equal(t, true, after)
 }
 
-// TestTestConnectionClose tests Close method
+// TestTestConnectionClose tests closing the connection.
 func TestTestConnectionClose(t *testing.T) {
-	closed := make(chan struct{})
-	c := TestConnection{
-		EventOutCh: make(chan<- Event),
-		EventInCh:  make(<-chan Event),
-		closed:     closed,
-	}
-
-	select {
-	case <-closed:
-		t.Fatal("closed chan should not return anything")
-	default:
-	}
-
-	c.Close()
-	v, err := test.ChTimeout(t, closed)
-
-	assert.NoError(t, err)
-	assert.Equal(t, struct{}{}, v)
-}
-
-// TestTestConnectionMultiClose tests closing the connection
-// multiple times
-func TestTestConnectionMultiClose(t *testing.T) {
 	c := TestConnection{
 		EventOutCh: make(chan<- Event),
 		EventInCh:  make(<-chan Event),
 		closed:     make(chan struct{}),
 	}
-	c.Close()
-	c.Close() // should not panic
-	c.Close() // should not panic
+
+	err := c.Close(nil)
+	assert.NoError(t, err)
+
+	err = c.Close(nil)
+	assert.ErrorIs(t, err, ErrConnectionClosed)
+
+	err = c.Close(nil)
+	assert.ErrorIs(t, err, ErrConnectionClosed)
+}
+
+// TestTestConnectionErr tests getting the error from a closed connection.
+func TestTestConnectionErr(t *testing.T) {
+	c := TestConnection{
+		EventOutCh: make(chan<- Event),
+		EventInCh:  make(<-chan Event),
+		closed:     make(chan struct{}),
+	}
+
+	testErr := errors.New("test error")
+
+	err := c.Close(testErr)
+	assert.NoError(t, err)
+	assert.ErrorIs(t, c.Err(), testErr)
 }
