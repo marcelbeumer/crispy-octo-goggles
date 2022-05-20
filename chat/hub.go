@@ -56,9 +56,7 @@ func (h *Hub) DisconnectAll() <-chan error {
 	errCh := make(chan error)
 
 	go func() {
-		defer close(errCh)
 		var wg sync.WaitGroup
-
 		for _, v := range h.userIds() {
 			userId := v
 			wg.Add(1)
@@ -69,8 +67,8 @@ func (h *Hub) DisconnectAll() <-chan error {
 				}
 			}()
 		}
-
 		wg.Wait()
+		close(errCh)
 	}()
 
 	return errCh
