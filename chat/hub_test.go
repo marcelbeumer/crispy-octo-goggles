@@ -32,33 +32,23 @@ func TestHubConnectUserEvents(t *testing.T) {
 	user1Events := []Event{}
 	user2Events := []Event{}
 
-	var user1Id hubId
-	var user2Id hubId
-	var g test.ErrGroup
-
 	didUser1Connect := make(chan struct{})
 	canDisconnect := make(chan struct{})
 	done := make(chan struct{})
 
+	var g test.ErrGroup
+
 	g.Go(func() error {
-		id, err := hub.Connect("user1", user1Conn)
-		user1Id = id
+		_, err := hub.Connect("user1", user1Conn)
 		<-didUser1Connect
-		id, err = hub.Connect("user2", user2Conn)
-		user2Id = id
+		_, err = hub.Connect("user2", user2Conn)
 		return err
 	})
 
 	g.Go(func() error {
 		<-canDisconnect
 		defer close(done)
-		if err := hub.Disconnect(user1Id); err != nil {
-			return err
-		}
-		if err := hub.Disconnect(user2Id); err != nil {
-			return err
-		}
-		return nil
+		return hub.DisconnectAll()
 	})
 
 	g.Go(func() error {

@@ -37,19 +37,38 @@ func (h *Hub) Connect(username string, conn Connection) (hubId, error) {
 	}
 	go func() {
 		if err := h.pumpFromUser(userId); err != nil {
-			h.Disconnect(userId)
+			h.disconnectUser(userId, err, true)
 		}
 	}()
 	go func() {
 		if err := h.pumpToUser(userId); err != nil {
-			h.Disconnect(userId)
+			h.disconnectUser(userId, err, true)
 		}
 	}()
 	return userId, nil
 }
 
 func (h *Hub) Disconnect(userId hubId) error {
-	return h.disconnectUser(userId, false)
+	return h.disconnectUser(userId, nil, true)
+}
+
+func (h *Hub) DisconnectAll() error {
+	var wg sync.WaitGroup
+	var wgErr error
+
+	for _, v := range h.userIds() {
+		userId := v
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := h.disconnectUser(userId, nil, false); err != nil {
+				wgErr = err
+			}
+		}()
+	}
+
+	wg.Wait()
+	return wgErr
 }
 
 func (h *Hub) genId() hubId {
@@ -91,7 +110,7 @@ func (h *Hub) newUser(username string, conn Connection) (hubId, error) {
 	return userId, nil
 }
 
-func (h *Hub) disconnectUser(userId hubId, notify bool) error {
+func (h *Hub) disconnectUser(userId hubId, err error, notify bool) error {
 	h.usersMu.Lock()
 	defer h.usersMu.Unlock()
 
@@ -238,7 +257,7 @@ func (h *Hub) sendEvent(e Event, userIds ...hubId) error {
 			return err
 		}
 		if err := user.events.Add(e); err != nil {
-			h.disconnectUser(userId, true) // unforgiving
+			h.disconnectUser(userId, err, true) // unforgiving
 			return err
 		}
 	}
