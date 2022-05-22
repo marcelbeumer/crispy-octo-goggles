@@ -3,14 +3,11 @@ package chat
 import (
 	"testing"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/now"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var logger log.NoopLoggerAdapter
 
 func TestHubConnectUserEvents(t *testing.T) {
 	now.EnableStub()
@@ -23,7 +20,7 @@ func TestHubConnectUserEvents(t *testing.T) {
 	nowStub.Frozen = true // less brittle
 	startTime := nowStub.Time
 
-	hub := NewHub(&logger)
+	hub := NewHub(test.NewTestLogger(true))
 
 	user1Ch := make(chan Event)
 	user2Ch := make(chan Event)
