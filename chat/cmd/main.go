@@ -11,8 +11,8 @@ import (
 )
 
 type ClientServerOpts struct {
-	Host string `help:"Server host." short:"h" default:"127.0.0.1"`
-	Port int    `help:"Server port." short:"p" default:"9998"`
+	Host string `help:"Server host." short:"h" default:"127.0.0.1" env:"HOST"`
+	Port int    `help:"Server port." short:"p" default:"9998"      env:"PORT"`
 }
 
 type ClientOpts struct {
