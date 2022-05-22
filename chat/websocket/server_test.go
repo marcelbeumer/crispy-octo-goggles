@@ -1,4 +1,4 @@
-package chat
+package websocket
 
 import (
 	"io"
@@ -16,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWebsocketServerHandleHttp(t *testing.T) {
+func TestServer(t *testing.T) {
 
 	t.Run("GET / should 400 not having an username", func(t *testing.T) {
-		wsServer := NewWebsocketServer(&log.NoopLoggerAdapter{})
+		wsServer := NewServer(&log.NoopLoggerAdapter{})
 		req := httptest.NewRequest("get", "/", nil)
 		w := httptest.NewRecorder()
 		wsServer.handleHttp(w, req)
@@ -32,7 +32,7 @@ func TestWebsocketServerHandleHttp(t *testing.T) {
 	})
 
 	t.Run("websocket on / should 400 not having an username", func(t *testing.T) {
-		wsServer := NewWebsocketServer(test.NewTestLogger(true))
+		wsServer := NewServer(test.NewTestLogger(true))
 		server := httptest.NewServer(http.HandlerFunc(wsServer.handleHttp))
 
 		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/"
@@ -54,7 +54,7 @@ func TestWebsocketServerHandleHttp(t *testing.T) {
 	})
 
 	t.Run("GET /?username=User should connect a websocket", func(t *testing.T) {
-		wsServer := NewWebsocketServer(test.NewTestLogger(true))
+		wsServer := NewServer(test.NewTestLogger(true))
 		server := httptest.NewServer(http.HandlerFunc(wsServer.handleHttp))
 
 		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/?username=User"
@@ -70,7 +70,7 @@ func TestWebsocketServerHandleHttp(t *testing.T) {
 			now.ClearStub()
 		})
 
-		wsServer := NewWebsocketServer(test.NewTestLogger(true))
+		wsServer := NewServer(test.NewTestLogger(true))
 
 		server := httptest.NewServer(http.HandlerFunc(wsServer.handleHttp))
 		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/?username=User"
