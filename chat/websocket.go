@@ -138,7 +138,6 @@ func (c *WebsocketConnection) Close(err error) error {
 		close(c.closed)
 		return c.wsConn.Close()
 	}
-	return nil
 }
 
 func (c *WebsocketConnection) Closed() bool {

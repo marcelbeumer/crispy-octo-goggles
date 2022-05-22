@@ -48,7 +48,7 @@ func TestHubConnectUserEvents(t *testing.T) {
 	g.Go(func() error {
 		<-canDisconnect
 		defer close(done)
-		return <-hub.DisconnectAll()
+		return hub.Close()
 	})
 
 	g.Go(func() error {

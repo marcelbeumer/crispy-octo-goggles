@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -28,9 +29,16 @@ type Hub struct {
 	users   *kvstore.KVStore[hubId, *hubUser]
 	usersMu sync.RWMutex
 	idInc   hubId
+	closed  chan struct{}
 }
 
 func (h *Hub) Connect(username string, conn Connection) (hubId, error) {
+	select {
+	case <-h.closed:
+		return 0, ErrHubClosed
+	default:
+	}
+
 	userId, err := h.newUser(username, conn)
 	if err != nil {
 		return userId, err
@@ -52,26 +60,29 @@ func (h *Hub) Disconnect(userId hubId) error {
 	return h.disconnectUser(userId, nil, true)
 }
 
-func (h *Hub) DisconnectAll() <-chan error {
-	errCh := make(chan error)
+func (h *Hub) Close() error {
+	h.usersMu.Lock()
+	select {
+	case <-h.closed:
+		h.usersMu.Unlock()
+		return ErrHubClosed
+	default:
+		close(h.closed)
+		h.usersMu.Unlock()
+	}
 
-	go func() {
-		var wg sync.WaitGroup
-		for _, v := range h.userIds() {
-			userId := v
+	var wg sync.WaitGroup
+	for _, userId := range h.userIds() {
+		userId := userId
+		go func() {
 			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := h.disconnectUser(userId, nil, false); err != nil {
-					errCh <- err
-				}
-			}()
-		}
-		wg.Wait()
-		close(errCh)
-	}()
+			defer wg.Done()
+			h.disconnectUser(userId, ErrHubClosed, false)
+		}()
+	}
+	wg.Wait()
 
-	return errCh
+	return nil
 }
 
 func (h *Hub) genId() hubId {
@@ -273,8 +284,13 @@ func NewHub(logger log.Logger) *Hub {
 		users:   kvstore.NewKVStore[int, *hubUser](),
 		usersMu: sync.RWMutex{},
 		idInc:   0,
+		closed:  make(chan struct{}),
 	}
 }
+
+// Used when disconnecting users on close,
+// or trying to connect when already closed.
+var ErrHubClosed = errors.New("hub closed")
 
 // ErrHubUserNotFound when hub did not find the user by id.
 type ErrUserNotFound struct {
