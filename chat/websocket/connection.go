@@ -23,6 +23,7 @@ type Connection struct {
 }
 
 func (c *Connection) SendEvent(e chat.Event) error {
+	// XXX: check is lock can be removed, now that we control order with the queue
 	c.l.Lock()
 	defer c.l.Unlock()
 
