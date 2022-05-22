@@ -14,6 +14,11 @@ import (
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 )
 
+var websocketUpgrader = ws.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
 var websocketHandlers = map[string]func() Event{
 	"connected":      func() Event { return &EventConnected{} },
 	"userListUpdate": func() Event { return &EventUserListUpdate{} },
@@ -209,12 +214,9 @@ type WebsocketServer struct {
 
 func NewWebsocketServer(logger log.Logger) *WebsocketServer {
 	return &WebsocketServer{
-		logger: logger,
-		hub:    NewHub(logger),
-		upgrader: ws.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-		},
+		logger:   logger,
+		hub:      NewHub(logger),
+		upgrader: websocketUpgrader,
 	}
 }
 
