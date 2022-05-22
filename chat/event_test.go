@@ -18,13 +18,12 @@ func TestEventMetaWhen(t *testing.T) {
 }
 
 func TestNewEventMetaNow(t *testing.T) {
-	now.EnableStub()
-	now.ResetStub()
+	nowStub := now.SetupStub()
 	t.Cleanup(func() {
-		now.DisableStub()
+		now.ClearStub()
 	})
 	m := NewEventMetaNow()
-	assert.Equal(t, now.CurrStub().Time, m.Time)
+	assert.Equal(t, nowStub.Time, m.Time)
 }
 
 func TestEventUserListUpdateJSON(t *testing.T) {

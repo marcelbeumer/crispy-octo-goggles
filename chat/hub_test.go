@@ -10,13 +10,11 @@ import (
 )
 
 func TestHubConnectUserEvents(t *testing.T) {
-	now.EnableStub()
-	now.ResetStub()
+	nowStub := now.SetupStub()
 	t.Cleanup(func() {
-		now.DisableStub()
+		now.ClearStub()
 	})
 
-	nowStub := now.CurrStub()
 	nowStub.Frozen = true // less brittle
 	startTime := nowStub.Time
 

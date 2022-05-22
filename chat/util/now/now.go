@@ -26,34 +26,22 @@ func NewStub() *Stub {
 	return &Stub{Time: time.UnixMilli(0), Step: time.Second}
 }
 
-var stub = NewStub()
+var stub *Stub
 var stubLock sync.Mutex // for concurrent tests
-var useStub = false
 
-func EnableStub() {
+func SetupStub() *Stub {
 	stubLock.Lock()
-	useStub = true
-}
-
-func DisableStub() {
-	useStub = true
-	stubLock.Unlock()
-}
-
-func ResetStub() {
 	stub = NewStub()
-}
-
-func CurrStub() *Stub {
 	return stub
 }
 
-func Stubbed() bool {
-	return useStub
+func ClearStub() {
+	stub = nil
+	stubLock.Unlock()
 }
 
 func Now() time.Time {
-	if useStub {
+	if stub != nil {
 		return stub.Now()
 	} else {
 		return time.Now()
