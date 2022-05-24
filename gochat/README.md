@@ -7,7 +7,7 @@ Basic chat room application using WebSockets and gRPC. Requires Go 1.18.
 ## Installation
 
 ```
-go install github.com/marcelbeumer/crispy-octo-goggles/gochat@latest
+go install -a github.com/marcelbeumer/crispy-octo-goggles/gochat@latest
 ```
 
 ## Running from source
