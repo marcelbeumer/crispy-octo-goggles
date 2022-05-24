@@ -39,7 +39,7 @@ func main() {
 	cli := Commands{}
 	ctx := kong.Parse(
 		&cli,
-		kong.Name("chat"),
+		kong.Name("gochat"),
 		kong.UsageOnError(),
 	)
 
