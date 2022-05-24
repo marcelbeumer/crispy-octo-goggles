@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/channel"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/util/channel"
 )
 
 type StdoutFrontend struct {

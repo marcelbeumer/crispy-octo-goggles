@@ -3,7 +3,7 @@ package test
 import (
 	"os"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
 )
 
 func NewTestLogger(silent bool) log.Logger {

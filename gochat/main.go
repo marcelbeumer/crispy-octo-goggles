@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/grpc"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/websocket"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/grpc"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/websocket"
 )
 
 type ClientServerOpts struct {

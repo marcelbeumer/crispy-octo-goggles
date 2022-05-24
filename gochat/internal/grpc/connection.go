@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 

@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
 )
 
 type Connection struct {

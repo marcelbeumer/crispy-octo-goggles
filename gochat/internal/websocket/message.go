@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/chat"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
 )
 
 type Message struct {

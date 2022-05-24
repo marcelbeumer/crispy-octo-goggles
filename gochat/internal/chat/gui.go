@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/awesome-gocui/gocui"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/chat/util/channel"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
+	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/util/channel"
 )
 
 type GUIFrontend struct {
