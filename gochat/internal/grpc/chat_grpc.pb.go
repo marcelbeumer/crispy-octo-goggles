@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.19.4
-// source: grpc/chat.proto
+// source: internal/grpc/chat.proto
 
 package grpc
 
@@ -133,5 +133,5 @@ var Hub_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "grpc/chat.proto",
+	Metadata: "internal/grpc/chat.proto",
 }
