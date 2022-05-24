@@ -7,13 +7,15 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat"
+	"github.com/marcelbeumer/crispy-octo-goggles/chat/grpc"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/log"
 	"github.com/marcelbeumer/crispy-octo-goggles/chat/websocket"
 )
 
 type ClientServerOpts struct {
-	Host string `help:"Server host." short:"h" default:"127.0.0.1" env:"HOST"`
-	Port int    `help:"Server port." short:"p" default:"9998"      env:"PORT"`
+	Host string `help:"Server host."                   short:"h" default:"127.0.0.1" env:"HOST"`
+	Port int    `help:"Server port."                   short:"p" default:"9998"      env:"PORT"`
+	Grpc bool   `help:"Use GRPC instead of websockets"`
 }
 
 type ClientOpts struct {
@@ -31,8 +33,6 @@ type Commands struct {
 	Server struct {
 		ClientServerOpts
 	} `help:"Start server"                           cmd:"client"`
-	Test struct {
-	} `help:"Run non-http test scenario"             cmd:"test"`
 }
 
 func main() {
@@ -61,10 +61,18 @@ func main() {
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
 
-		conn, err := websocket.NewClientConnection(addr, cli.Client.Username, logger)
+		var conn chat.Connection
+		var err error
+
+		if cli.Client.Grpc {
+			conn, err = grpc.NewClientConnection(addr, cli.Client.Username, logger)
+		} else {
+			conn, err = websocket.NewClientConnection(addr, cli.Client.Username, logger)
+		}
+
 		if err != nil {
 			logger.Errorw(
-				"could not connect websocket",
+				"could not create connection",
 				log.Error(err),
 				"addr", addr,
 			)
@@ -103,14 +111,20 @@ func main() {
 		}
 
 		addr := fmt.Sprintf("%s:%d", cli.Server.Host, cli.Server.Port)
-		s := websocket.NewServer(logger)
 
-		if err := s.Start(addr); err != nil {
-			logger.Error("server error", log.Error(err))
-			exit(1)
+		if cli.Server.Grpc {
+			s := grpc.NewServer(logger)
+			if err := s.Start(addr); err != nil {
+				logger.Error("server error", log.Error(err))
+				exit(1)
+			}
+
+		} else {
+			s := websocket.NewServer(logger)
+			if err := s.Start(addr); err != nil {
+				logger.Error("server error", log.Error(err))
+				exit(1)
+			}
 		}
-
-	case "test":
-
 	}
 }

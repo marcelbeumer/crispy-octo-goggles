@@ -1,0 +1,51 @@
+syntax = "proto3";
+package chat;
+
+option go_package = "github.com/marcelbeumer/crispy-octo-goggles/chat/grpc";
+import "google/protobuf/timestamp.proto";
+
+message Connected {
+  google.protobuf.Timestamp time = 1;
+  repeated string users = 2;
+}
+
+message UserListUpdate {
+  google.protobuf.Timestamp time = 1;
+  repeated string users = 2;
+}
+
+message UserEnter {
+  google.protobuf.Timestamp time = 1;
+  string name = 2;
+}
+
+message UserLeave {
+  google.protobuf.Timestamp time = 1;
+  string name = 2;
+}
+
+message SendMessage {
+  google.protobuf.Timestamp time = 1;
+  string message = 2;
+}
+
+message NewMessage {
+  google.protobuf.Timestamp time = 1;
+  string sender = 2;
+  string message = 3;
+}
+
+message EventEnvelope {
+  oneof event {
+        Connected connected = 2;
+        UserListUpdate userListUpdate = 3;
+        UserEnter userEnter = 4;
+        UserLeave userLeave = 5;
+        SendMessage sendMessage = 6;
+        NewMessage newMessage = 7;
+    }
+}
+
+service Hub {
+  rpc Chat(stream EventEnvelope) returns (stream EventEnvelope);
+}
