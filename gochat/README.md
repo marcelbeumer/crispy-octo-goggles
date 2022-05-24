@@ -1,6 +1,6 @@
 # GoChat
 
-Basic chat room application using WebSockets and gRPC. Requires Go 1.18.
+Basic chat room application using WebSockets and gRPC. Requires Go 1.18+.
 
 <img src="./assets/screenshot.jpg" width="800px" />
 
