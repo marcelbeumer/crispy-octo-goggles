@@ -40,5 +40,6 @@ gochat --help
 
 ## TODO
 
+- Try to use [copygen](https://github.com/switchupcb/copygen) for mapping gRPC structs.
 - Write more tests.
 - Production setup: Dockerfile, (client) install/usage instructions.
