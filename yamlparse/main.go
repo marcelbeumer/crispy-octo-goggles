@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type Root struct {
@@ -40,7 +40,7 @@ func test(fpath string) error {
 }
 
 func main() {
-	fpath := "./yamlparse/example.yaml"
+	fpath := "./example.yaml"
 	if len(os.Args) > 1 {
 		fpath = os.Args[1]
 	}
