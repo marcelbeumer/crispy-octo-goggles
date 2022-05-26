@@ -1,16 +1,25 @@
 # GoChat
 
-Basic chat room application using WebSockets, gPRC and a terminal UI. Requires Go 1.18+.
+Basic chat room application using WebSockets, gRPC and a terminal UI. Requires Go 1.18+.
 
 <img src="./assets/screenshot.jpg" width="800px" />
 
 ## Installation
 
+### Go install
+
 ```
 go install -a github.com/marcelbeumer/crispy-octo-goggles/gochat@latest
 ```
 
-## Running from source
+### Docker
+
+```
+docker build -t gochat .
+docker run -it --rm --network host gochat
+```
+
+## Run from source
 
 ```
 go run .
@@ -42,4 +51,3 @@ gochat --help
 
 - Try to use [copygen](https://github.com/switchupcb/copygen) for mapping gRPC structs.
 - Write more tests.
-- Production setup: Dockerfile, (client) install/usage instructions.
