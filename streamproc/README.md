@@ -8,7 +8,7 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 - [Event API service](./services/event-api) that takes events and writes them to [Redpanda](https://redpanda.com)
 - [Consumer service "high"](./services/consumer-high) that consumes from Redpanda and writes amounts >5 to [TimescaleDB](https://www.timescale.com)
 - [Consumer service "low"](./services/consumer-low) that consumes from Redpanda and writes amounts <=5 to [InfluxDB](https://www.influxdata.com)
-- [Aggregator GraphQL service](./services/aggregator) providing both high and low time series data
+- [Aggregator service](./services/aggregator) providing both high and low time series data
 - [Web UI](./services/web-ui) that renders line chart for high and low data
 
 ## System requirements
