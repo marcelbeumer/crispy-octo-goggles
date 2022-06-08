@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -31,7 +33,7 @@ type Event struct {
 	Amount big.Float `json:"amount"`
 }
 
-type PostEventsBody []Event
+type PostEventsJsonBody []Event
 
 type ResponseBody struct {
 	Message string `json:"message"`
@@ -77,36 +79,66 @@ func (s *Server) writeBadRequest(err error, w http.ResponseWriter, r *http.Reque
 
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger
-	var postEventsBody PostEventsBody
-	dec := json.NewDecoder(r.Body)
-	err := dec.Decode(&postEventsBody)
-	if err != nil {
-		s.writeBadRequest(err, w, r)
-		return
-	}
+	var messages []kafka.Message
 
-	messages := make([]kafka.Message, len(postEventsBody))
-	for i, event := range postEventsBody {
-		msg, err := json.Marshal(event)
+	contentType := r.Header.Get("Content-Type")
+	switch contentType {
+
+	// Validates but wastes time with parsing/serializing JSON
+	case "application/json":
+		var postEventsBody PostEventsJsonBody
+		dec := json.NewDecoder(r.Body)
+		err := dec.Decode(&postEventsBody)
 		if err != nil {
 			s.writeBadRequest(err, w, r)
 			return
 		}
-		messages[i] = kafka.Message{Value: msg}
+
+		messages = make([]kafka.Message, len(postEventsBody))
+		for i, event := range postEventsBody {
+			msg, err := json.Marshal(event)
+			if err != nil {
+				s.writeBadRequest(err, w, r)
+				return
+			}
+			messages[i] = kafka.Message{Value: msg}
+		}
+
+	// Does not validate but passes on messages quickly
+	case "application/text":
+		scanner := bufio.NewScanner(r.Body)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" {
+				messages = append(messages, kafka.Message{
+					Value: []byte(line),
+				})
+			}
+		}
+		if scanner.Err() != nil {
+			s.writeBadRequest(scanner.Err(), w, r)
+			return
+		}
+
+	default:
+		s.writeBadRequest(fmt.Errorf("unsupported content type %s", contentType), w, r)
+		return
 	}
 
 	s.kafkaConn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	_, err = s.kafkaConn.WriteMessages(messages...)
+	_, err := s.kafkaConn.WriteMessages(messages...)
 	if err != nil {
 		s.writeBadRequest(err, w, r)
 		return
 	}
 
-	logger.Infow("ingested events", "count", len(postEventsBody))
+	logger.Infow("ingested events",
+		"count", len(messages),
+		"contentType", contentType)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ResponseBody{
-		Message: fmt.Sprintf("ingested %d events", len(postEventsBody)),
+		Message: fmt.Sprintf("ingested %d events", len(messages)),
 	})
 	return
 }

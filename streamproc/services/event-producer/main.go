@@ -16,8 +16,9 @@ import (
 )
 
 type CLI struct {
-	APIHost string `help:"API host." short:"h" default:"127.0.0.1" env:"API_HOST"`
-	APIPort int    `help:"API port." short:"p" default:"9998"      env:"API_PORT"`
+	APIHost   string `help:"API host."                                         short:"h" default:"127.0.0.1" env:"API_HOST"`
+	APIPort   int    `help:"API port."                                         short:"p" default:"9998"      env:"API_PORT"`
+	PlainText bool   `help:"Send events to the API plain text instead of JSON"                               env:"PLAIN_TEXT"`
 }
 
 type EventBuffer struct {
@@ -66,25 +67,37 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(time.Second * 2)
-
 			events := buffer.Flush()
 			if len(events) == 0 {
 				continue
 			}
 
-			j, err := json.Marshal(&events)
-			if err != nil {
-				log.Fatal(err)
+			url := fmt.Sprintf("http://%s:%d", cli.APIHost, cli.APIPort)
+			var contentType string
+			var reqBody []byte
+
+			if cli.PlainText {
+				contentType = "application/text"
+				for _, event := range events {
+					line, err := json.Marshal(&event)
+					if err != nil {
+						log.Fatal(err)
+					}
+					if len(reqBody) > 0 {
+						reqBody = append(reqBody, []byte("\n")...)
+					}
+					reqBody = append(reqBody, line...)
+				}
+			} else {
+				contentType = "application/json"
+				j, err := json.Marshal(&events)
+				if err != nil {
+					log.Fatal(err)
+				}
+				reqBody = j
 			}
 
-			// fmt.Printf("sending %s\n", string(j))
-
-			resp, err := http.Post(
-				fmt.Sprintf("http://%s:%d", cli.APIHost, cli.APIPort),
-				"application/json",
-				bytes.NewBuffer(j),
-			)
-
+			resp, err := http.Post(url, contentType, bytes.NewBuffer(reqBody))
 			if err != nil {
 				fmt.Printf("request error: %s\n", err)
 				buffer.Recover(events)
@@ -92,9 +105,9 @@ func main() {
 			}
 
 			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
+			respBody, err := ioutil.ReadAll(resp.Body)
 			if resp.StatusCode >= 400 {
-				fmt.Printf("request http %d: %s\n", resp.StatusCode, body)
+				fmt.Printf("request http %d: %s\n", resp.StatusCode, respBody)
 				buffer.Recover(events)
 				continue
 			}
