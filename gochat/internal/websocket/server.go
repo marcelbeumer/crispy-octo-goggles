@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	ws "github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
+	"github.com/marcelbeumer/go-playground/gochat/internal/chat"
+	"github.com/marcelbeumer/go-playground/gochat/internal/log"
 )
 
 var upgrader = ws.Upgrader{

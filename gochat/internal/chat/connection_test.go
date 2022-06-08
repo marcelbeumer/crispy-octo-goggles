@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/util/test"
+	"github.com/marcelbeumer/go-playground/gochat/internal/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

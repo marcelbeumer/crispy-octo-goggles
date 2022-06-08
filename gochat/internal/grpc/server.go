@@ -3,8 +3,8 @@ package grpc
 import (
 	"net"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
+	"github.com/marcelbeumer/go-playground/gochat/internal/chat"
+	"github.com/marcelbeumer/go-playground/gochat/internal/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

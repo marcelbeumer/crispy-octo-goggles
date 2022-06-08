@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
+	"github.com/marcelbeumer/go-playground/gochat/internal/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"

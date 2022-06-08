@@ -9,7 +9,7 @@ Basic chat room application using WebSockets, gRPC and a terminal UI. Requires G
 ### Go install
 
 ```
-go install -a github.com/marcelbeumer/crispy-octo-goggles/gochat@latest
+go install -a github.com/marcelbeumer/go-playground/gochat@latest
 ```
 
 ### Docker

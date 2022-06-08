@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/crispy-octo-goggles/websockets/client"
-	"github.com/marcelbeumer/crispy-octo-goggles/websockets/server"
+	"github.com/marcelbeumer/go-playground/websockets/client"
+	"github.com/marcelbeumer/go-playground/websockets/server"
 )
 
 type ClientServerOpts struct {

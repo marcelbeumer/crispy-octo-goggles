@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/util/now"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/util/test"
+	"github.com/marcelbeumer/go-playground/gochat/internal/log"
+	"github.com/marcelbeumer/go-playground/gochat/internal/util/now"
+	"github.com/marcelbeumer/go-playground/gochat/internal/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

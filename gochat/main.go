@@ -6,10 +6,10 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/grpc"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/websocket"
+	"github.com/marcelbeumer/go-playground/gochat/internal/chat"
+	"github.com/marcelbeumer/go-playground/gochat/internal/grpc"
+	"github.com/marcelbeumer/go-playground/gochat/internal/log"
+	"github.com/marcelbeumer/go-playground/gochat/internal/websocket"
 )
 
 type ClientServerOpts struct {

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/kvstore"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/log"
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/queue"
+	"github.com/marcelbeumer/go-playground/gochat/internal/kvstore"
+	"github.com/marcelbeumer/go-playground/gochat/internal/log"
+	"github.com/marcelbeumer/go-playground/gochat/internal/queue"
 )
 
 // Use simple int increment for ids.

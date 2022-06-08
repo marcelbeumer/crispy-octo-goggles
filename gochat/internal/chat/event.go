@@ -3,7 +3,7 @@ package chat
 import (
 	"time"
 
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/util/now"
+	"github.com/marcelbeumer/go-playground/gochat/internal/util/now"
 )
 
 // Event is the interface for all events

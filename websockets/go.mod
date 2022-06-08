@@ -1,4 +1,4 @@
-module github.com/marcelbeumer/crispy-octo-goggles/websockets
+module github.com/marcelbeumer/go-playground/websockets
 
 go 1.18
 

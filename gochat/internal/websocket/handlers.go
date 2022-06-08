@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	"github.com/marcelbeumer/crispy-octo-goggles/gochat/internal/chat"
+	"github.com/marcelbeumer/go-playground/gochat/internal/chat"
 )
 
 var handlers = map[string]func() chat.Event{

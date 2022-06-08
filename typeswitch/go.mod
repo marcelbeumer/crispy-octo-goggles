@@ -1,3 +1,3 @@
-module github.com/marcelbeumer/crispy-octo-goggles/typeswitch
+module github.com/marcelbeumer/go-playground/typeswitch
 
 go 1.18

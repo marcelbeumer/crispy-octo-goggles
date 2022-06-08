@@ -1,4 +1,4 @@
-module github.com/marcelbeumer/crispy-octo-goggles/gochat
+module github.com/marcelbeumer/go-playground/gochat
 
 go 1.18
 

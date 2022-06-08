@@ -1,3 +1,3 @@
-module github.com/marcelbeumer/crispy-octo-goggles/typednil
+module github.com/marcelbeumer/go-playground/typednil
 
 go 1.18

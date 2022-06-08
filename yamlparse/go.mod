@@ -1,4 +1,4 @@
-module github.com/marcelbeumer/crispy-octo-goggles/yamlparse
+module github.com/marcelbeumer/go-playground/yamlparse
 
 go 1.18
 
