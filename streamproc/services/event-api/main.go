@@ -29,8 +29,8 @@ type CLI struct {
 }
 
 type Event struct {
-	Time   int64     `json:"time"`
-	Amount big.Float `json:"amount"`
+	Time   int64      `json:"time"`
+	Amount *big.Float `json:"amount"`
 }
 
 type PostEventsJsonBody []Event
@@ -67,7 +67,10 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
-	//
+	logger := s.logger
+	if err := s.kafkaConn.Close(); err != nil {
+		logger.Errorw("failed to close kafka connection", log.Error(err))
+	}
 }
 
 func (s *Server) writeBadRequest(err error, w http.ResponseWriter, r *http.Request) {

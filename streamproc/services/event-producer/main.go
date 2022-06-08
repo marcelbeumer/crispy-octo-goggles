@@ -51,7 +51,7 @@ type Event struct {
 	// Time is timestamp in UnixMilli
 	Time int64 `json:"time"`
 	// Amount if number between 0-10
-	Amount big.Float `json:"amount"`
+	Amount *big.Float `json:"amount"`
 }
 
 func main() {
@@ -117,7 +117,7 @@ func main() {
 	for {
 		event := Event{
 			Time:   time.Now().UnixMilli(),
-			Amount: *big.NewFloat(rand.Float64() * 10),
+			Amount: big.NewFloat(rand.Float64() * 10),
 		}
 		buffer.Append(event)
 		time.Sleep(time.Second)
