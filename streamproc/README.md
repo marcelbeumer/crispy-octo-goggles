@@ -5,7 +5,7 @@
 Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local development setup.
 
 - [Event producer](./services/event-producer) that generates events in JSON format of `{ amount: number }`
-- [Event API service](./services/event-api) that takes events and writes them to [Redpanda](https://redpanda.com)
+- [Event API service](./services/event-api) that takes events and writes them to [Kafka](https://kafka.apache.org)
 - [Consumer service "high"](./services/consumer-high) that consumes from Kafka and writes amounts >5 to [TimescaleDB](https://www.timescale.com)
 - [Consumer service "low"](./services/consumer-low) that consumes from Kafka and writes amounts <=5 to [InfluxDB](https://www.influxdata.com)
 - [Aggregator service](./services/aggregator) providing both high and low time series data
