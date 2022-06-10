@@ -68,6 +68,8 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 	go s.consumeKafka(ctx)
 
 	r := mux.NewRouter()
+	r.HandleFunc("/", s.readyProbe).Methods("GET")
+
 	return http.ListenAndServe(addr, r)
 }
 
@@ -78,6 +80,11 @@ func (s *Server) Shutdown(ctx context.Context) {
 	if err := s.kafkaConn.Close(); err != nil {
 		logger.Errorw("failed to close kafka connection", log.Error(err))
 	}
+}
+
+func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "ok")
 }
 
 func (s *Server) consumeKafka(ctx context.Context) {

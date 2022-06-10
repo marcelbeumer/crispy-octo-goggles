@@ -61,6 +61,7 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 	s.kafkaConn = conn
 
 	r := mux.NewRouter()
+	r.HandleFunc("/", s.readyProbe).Methods("GET")
 	r.HandleFunc("/", s.postEvents).Methods("POST")
 
 	return http.ListenAndServe(addr, r)
@@ -71,6 +72,11 @@ func (s *Server) Shutdown(ctx context.Context) {
 	if err := s.kafkaConn.Close(); err != nil {
 		logger.Errorw("failed to close kafka connection", log.Error(err))
 	}
+}
+
+func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "ok")
 }
 
 func (s *Server) writeBadRequest(err error, w http.ResponseWriter, r *http.Request) {

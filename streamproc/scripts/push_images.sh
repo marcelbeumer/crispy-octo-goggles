@@ -16,6 +16,6 @@ services=( "consumer-high" "consumer-low" "event-api" "event-producer")
 for name in "${services[@]}"
 do
 	echo ">>> pushing image for $name"
-  docker tag streamproc/k3d/$name:latest $host:$port/streamproc/$name:latest
-  docker push $host:$port/streamproc/$name:latest
+  docker tag streamproc/k3d/$name:latest $host:$port/$name:latest
+  docker push $host:$port/$name:latest
 done
