@@ -1,2 +1,2 @@
 #!/bin/sh
-helm upgrade streamproc ./helm
+helm upgrade streamproc ./helm_chart
