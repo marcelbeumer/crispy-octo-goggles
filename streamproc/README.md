@@ -1,6 +1,6 @@
 # StreamProc
 
-**WARNING: WORK IN PROGRESS, NOT FUNCTIONAL YET**
+**WARNING: WORK IN PROGRESS, SEE [TODO](#TODO)**
 
 Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local development setup.
 
@@ -13,11 +13,25 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 
 ## System requirements
 
-- Install [node](https://nodejs.org/en/) >=16
-- Install [golang](https://go.dev) >=1.18
-- Install [watchexec](https://github.com/watchexec/watchexec)
-- Install [docker](https://www.docker.com)
-- Install [k3d](https://k3d.io) or [kind](https://kind.sigs.k8s.io)
-- Install [helm](https://helm.sh)
-- Install [helmdiff](https://github.com/databus23/helm-diff)
-- Install [helmfile](https://github.com/roboll/helmfile)
+- [golang](https://go.dev) >=1.18
+- [docker](https://www.docker.com)
+- [k3d](https://k3d.io) or [kind](https://kind.sigs.k8s.io)
+- [helm](https://helm.sh)
+
+## Setup
+
+- Build local docker images using `./scripts/build_images.sh`
+- Create a k3d cluster with `./scripts/create_k3d_cluster.sh`
+- Push local images to k3d registry with `./scripts/push_images.sh`
+- Install helm chart with `helm install streamproc ./helm_chart`
+
+## TODO
+
+- Implement services properly, gracefully waiting for kafka, gracefully recovering from lost connections
+- Add event producer pod
+- Setup local dev with telepresence
+- Implement db storage for consumer-high|low
+- Implement aggregator
+- Implement simple web ui
+- Update readme with k8s specific commands (logs, restarts)
+- Update readme with alternative on local dev w/ file mounts and watchers
