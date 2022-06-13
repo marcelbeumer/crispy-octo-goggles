@@ -3,4 +3,4 @@ dependencies:
   repository: https://charts.bitnami.com/bitnami/kafka
   version: 17.2.5
 digest: sha256:0b4bb2c6316e1aa99e6f288143a0b917fb6dc3038fce830fd8ab06261a0fe4c9
-generated: "2022-06-10T21:48:06.943221+02:00"
+generated: "2022-06-13T22:48:35.171084+02:00"
