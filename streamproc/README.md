@@ -64,15 +64,13 @@ Example running "event-api" locally.
 
 ### File mounts and watchers
 
-This is not demonstrated in this repository because it's somewhat tedious to set up.
+This is not demonstrated in this repository because it requires a bunch of configuration and scripting, worth a separate demo project/repo.
 
 First, you need to decide if you want to rebuild in the docker container on the cluster or on your local machine.
 
 When you want to rebuild in the docker container you will to mount the source tree from your local machine to the k3d cluster and containers. You then create a separate "dev target" in each Dockerfile that watches the source tree (using [watchexec](https://watchexec.github.io) is recommended), rebuilds from source and restarts the service, or just `go run` from source and restart on change. The advantage is that you don't need to do cross compilation _for_ the container, but the downside is that you need to mount the source tree, which can become a performance issue.
 
 When you want to rebuild on your local machine (_for_ the docker container) you will need to mount the local build artifacts to your k3d cluster and containers. Also for this solution your create a separate "dev target" in each Dockerfile that watches the binary (build artifact(s)) and restarts the service on change (also here running [watchexec](https://watchexec.github.io) in the container is recommended). The local machine then needs to correctly cross compile for the container (`GOOS=<os> GOARCH=<arch> go build`). The advantage is that file watching will not become a performance issue, but the downside is that you need to manage your cross compilation (and OS/arch detection) in scripts.
-
-Both approaches are quite doable, but require a bunch of configuration and scripting, worth a separate demo project/repo.
 
 ## TODO
 
