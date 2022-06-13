@@ -27,19 +27,40 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 
 ## Local development
 
-Pushing new docker images on code changes can be slow and tedious. A few strategies for local development with a (local) k8s cluster:
+Some strategies for local development with a (local) k8s cluster:
 
-- Use [telepresence](https://www.telepresence.io) to intercept traffic from/to a service in the cluster to the local machine.
+- Use `helm upgrade` after pushing new docker images on code change. Slow and tedious, but real cluster deployment.
 - Use `kubectl port-forward` to expose services from the cluster to the local machine, using those in local processes / services.
+- Use [telepresence](https://www.telepresence.io) to intercept traffic from/to a service in the cluster to the local machine.
 - Use combination of file mounts and file watchers to initiate rebuilds on code change and automatically restarting services.
 
-### Telepresence
+### Helm upgrade after pushing new docker images
 
-TODO
+Helm chart contains deployment metadata annotations (`{{ now | quote }}` on `spec.template.metadata.annotations.timestamp`).
+In combination with `pullPolicy: Always`, this will cause k8s to redeploy when we upgrade the helm chart to a new revision.
+
+- Run `./scripts/build_images.sh && ./scripts/push_images.sh`.
+- Run `helm upgrade streamproc ./helm_chart`.
+
+Use `kubectl get pod -w` to see the redeploy happening.
 
 ### Kubectl port-forward
 
-TODO
+Example running "event-producer" locally, which requires "event-api" from the cluster.
+
+- Run `kubectl port-forward svc/streamproc-event-api 9998:9998` in a seperate shell.
+- Run `cd services/event-producer && go run .` in another shell.
+
+### Telepresence
+
+Example running "event-api" locally.
+
+- Install [telepresence](https://www.telepresence.io).
+- Run `telepresence connect` to connect to cluster in context.
+- Run `telepresence list` to see list of services that can be intercepted.
+- Run `telepresence intercept streamproc-event-api --env-file ~/tmp.env` to start intercepting.
+- Run `export $(cat ~/tmp.env | xargs)` to export all env vars.
+- Run `cd services/event-api && go run .` to start the service locally.
 
 ### File mounts and watchers
 
@@ -47,8 +68,6 @@ TODO
 
 ## TODO
 
-- Setup local dev with telepresence
-- Implement services properly, gracefully waiting for kafka, gracefully recovering from lost connections
 - Add event producer pod
 - Implement db storage for consumer-high|low
 - Implement aggregator
