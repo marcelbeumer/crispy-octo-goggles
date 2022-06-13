@@ -18,6 +18,21 @@ timescaledb:
   affinity: {}
   tolerations: {}
 
+influxdb:
+  port: 8086
+  serviceType: ClusterIP
+  storageClassName: ""
+  storage: 100G
+  image:
+    repository: influxdb
+    tag: "2.0.6"
+    pullPolicy: Always
+  imagePullSecrets: []
+  resources: {}
+  nodeSelector: {}
+  affinity: {}
+  tolerations: {}
+
 serviceAccount:
   create: true
   annotations: {}
