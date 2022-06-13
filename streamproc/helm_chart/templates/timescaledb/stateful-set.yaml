@@ -33,9 +33,6 @@ spec:
             - secretRef:
                 name: {{ include "helm.fullname" . }}-{{ $service }}-secrets
           args: ["-c", "max_connections={{ $values.maxConnections }}"]
-          env:
-            - name: POSTGRES_DB
-              value: {{ $values.sysDb }}
           ports:
             - containerPort: {{ $values.port }}
               name: timescaledb
