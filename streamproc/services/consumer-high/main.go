@@ -38,7 +38,7 @@ type ResponseBody struct {
 
 type Server struct {
 	logger    log.Logger
-	kafkaConn *kafka.Conn
+	reader    *kafka.Reader
 	ctx       context.Context
 	cancel    context.CancelFunc
 	watermark float64
@@ -58,18 +58,19 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 	ctx, cancel := context.WithCancel(context.Background())
 	s.ctx = ctx
 	s.cancel = cancel
+	s.reader = kafka.NewReader(kafka.ReaderConfig{
+		Brokers:   []string{kafkaAddr},
+		Topic:     kafkaTopic,
+		Partition: 0,
+		MinBytes:  10,
+		MaxBytes:  10e6, // 10MB
+	})
 
-	conn, err := kafka.DialLeader(context.Background(), "tcp", kafkaAddr, kafkaTopic, 0)
-	if err != nil {
-		return err
-	}
-	s.kafkaConn = conn
-
-	// go s.consumeKafka(ctx)
-
+	go s.consumeKafka(ctx)
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
 
+	logger.Infow("listening", "addr", addr)
 	return http.ListenAndServe(addr, r)
 }
 
@@ -77,8 +78,8 @@ func (s *Server) Shutdown(ctx context.Context) {
 	logger := s.logger
 	s.cancel()
 
-	if err := s.kafkaConn.Close(); err != nil {
-		logger.Errorw("failed to close kafka connection", log.Error(err))
+	if err := s.reader.Close(); err != nil {
+		logger.Errorw("failed to close kafka reader", log.Error(err))
 	}
 }
 
@@ -87,39 +88,42 @@ func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "ok")
 }
 
+func (s *Server) handleKafkaError(err error, msg string) {
+	logger := s.logger
+	sleepSec := 10
+	logger.Errorw(
+		msg,
+		log.Error(err),
+		"sleepSec", sleepSec,
+	)
+	time.Sleep(time.Second * time.Duration(sleepSec))
+}
+
 func (s *Server) consumeKafka(ctx context.Context) {
 	logger := s.logger
+
 	for {
 		select {
 		case <-ctx.Done():
 		default:
-			conn := s.kafkaConn
-			batch := conn.ReadBatch(100, 1e6)
-			b := make([]byte, 10e3)
-			for {
-				n, err := batch.Read(b)
-				if err != nil {
-					break
-				}
-				var event Event
-				if err := json.Unmarshal(b[:n], &event); err != nil {
-					logger.Errorw("failed to parse message", log.Error(err))
-					continue
-				}
-
-				amount, _ := event.Amount.Float64()
-				if amount > s.watermark {
-					logger.Infow("have message with high amount",
-						"time", event.Time,
-						"amount", event.Amount.String(),
-					)
-				}
+			m, err := s.reader.ReadMessage(context.Background())
+			if err != nil {
+				s.handleKafkaError(err, "failed to read message (sleeping before retrying)")
+				continue
+			}
+			var event Event
+			if err := json.Unmarshal(m.Value, &event); err != nil {
+				s.handleKafkaError(err, "failed to parse message")
+				continue
 			}
 
-			if err := batch.Close(); err != nil {
-				logger.Errorw("failed to close kafka batch", log.Error(err))
+			amount, _ := event.Amount.Float64()
+			if amount > s.watermark {
+				logger.Infow("have message with high amount",
+					"time", event.Time,
+					"amount", event.Amount.String(),
+				)
 			}
-
 		}
 	}
 }

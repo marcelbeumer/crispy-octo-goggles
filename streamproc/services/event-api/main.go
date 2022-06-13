@@ -40,8 +40,10 @@ type ResponseBody struct {
 }
 
 type Server struct {
-	logger    log.Logger
-	kafkaConn *kafka.Conn
+	logger log.Logger
+	writer *kafka.Writer
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func NewServer(logger log.Logger) *Server {
@@ -54,11 +56,14 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 	logger := s.logger
 	logger.Infow("starting server", "addr", addr)
 
-	conn, err := kafka.DialLeader(context.Background(), "tcp", kafkaAddr, kafkaTopic, 0)
-	if err != nil {
-		return err
-	}
-	s.kafkaConn = conn
+	ctx, cancel := context.WithCancel(context.Background())
+	s.ctx = ctx
+	s.cancel = cancel
+	s.writer = kafka.NewWriter(kafka.WriterConfig{
+		Brokers:  []string{kafkaAddr},
+		Topic:    kafkaTopic,
+		Balancer: &kafka.LeastBytes{},
+	})
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
@@ -69,8 +74,8 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 
 func (s *Server) Shutdown(ctx context.Context) {
 	logger := s.logger
-	if err := s.kafkaConn.Close(); err != nil {
-		logger.Errorw("failed to close kafka connection", log.Error(err))
+	if err := s.writer.Close(); err != nil {
+		logger.Errorw("failed to close kafka writer", log.Error(err))
 	}
 }
 
@@ -134,8 +139,7 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.kafkaConn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	_, err := s.kafkaConn.WriteMessages(messages...)
+	err := s.writer.WriteMessages(s.ctx, messages...)
 	if err != nil {
 		s.writeBadRequest(err, w, r)
 		return
