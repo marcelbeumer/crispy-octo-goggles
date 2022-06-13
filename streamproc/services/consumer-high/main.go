@@ -65,7 +65,7 @@ func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string
 	}
 	s.kafkaConn = conn
 
-	go s.consumeKafka(ctx)
+	// go s.consumeKafka(ctx)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
