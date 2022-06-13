@@ -1,3 +1,8 @@
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
 timescaledb:
   port: 5432
   useSsl: false
@@ -32,11 +37,6 @@ influxdb:
   nodeSelector: {}
   affinity: {}
   tolerations: {}
-
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
 
 kafkaSettings:
   port: 9092
