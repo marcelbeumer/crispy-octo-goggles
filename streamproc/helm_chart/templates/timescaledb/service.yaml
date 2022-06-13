@@ -1,0 +1,17 @@
+{{- $values := .Values.timescaledb -}}
+{{- $service := "timescaledb" -}}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "helm.fullname" . }}-{{ $service }}
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
+spec:
+  type: {{ $values.serviceType }}
+  ports:
+    - port: {{ $values.port }}
+  selector:
+    {{ include "helm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
