@@ -77,3 +77,4 @@ When you want to rebuild on your local machine (_for_ the docker container) you 
 - Implement db storage for consumer-high|low
 - Implement aggregator
 - Implement simple web ui
+- Write script for kind as alt for k3d
