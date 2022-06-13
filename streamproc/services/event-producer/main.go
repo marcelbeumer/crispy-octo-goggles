@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
+
 	"math/big"
 	"math/rand"
 	"net/http"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/marcelbeumer/go-playground/streamproc/services/event-producer/internal/log"
 
 	"github.com/alecthomas/kong"
 )
@@ -55,6 +58,10 @@ type Event struct {
 }
 
 func main() {
+	zl := log.NewZapLogger(os.Stderr)
+	log.RedirectStdLog(zl)
+	logger := log.NewZapLoggerAdapter(zl)
+
 	cli := CLI{}
 	_ = kong.Parse(
 		&cli,
@@ -81,7 +88,8 @@ func main() {
 				for _, event := range events {
 					line, err := json.Marshal(&event)
 					if err != nil {
-						log.Fatal(err)
+						logger.Error(log.Error(err))
+						os.Exit(1)
 					}
 					if len(reqBody) > 0 {
 						reqBody = append(reqBody, []byte("\n")...)
@@ -92,14 +100,15 @@ func main() {
 				contentType = "application/json"
 				j, err := json.Marshal(&events)
 				if err != nil {
-					log.Fatal(err)
+					logger.Error(log.Error(err))
+					os.Exit(1)
 				}
 				reqBody = j
 			}
 
 			resp, err := http.Post(url, contentType, bytes.NewBuffer(reqBody))
 			if err != nil {
-				fmt.Printf("request error: %s\n", err)
+				logger.Errorw("request error", log.Error(err))
 				buffer.Recover(events)
 				continue
 			}
@@ -107,10 +116,15 @@ func main() {
 			defer resp.Body.Close()
 			respBody, err := ioutil.ReadAll(resp.Body)
 			if resp.StatusCode >= 400 {
-				fmt.Printf("request http %d: %s\n", resp.StatusCode, respBody)
+				logger.Errorw("request http error",
+					"statusCode", resp.StatusCode,
+					"responseBody", respBody)
 				buffer.Recover(events)
 				continue
 			}
+
+			logger.Infow("sent events",
+				"amount", len(events))
 		}
 	}()
 
