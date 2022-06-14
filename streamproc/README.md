@@ -21,8 +21,8 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 ## Setup
 
 - Build local docker images using `./scripts/build_images.sh`.
-- Create a k3d cluster with `./scripts/create_k3d_cluster.sh`.
-- Push local images to k3d registry with `./scripts/push_images.sh`.
+- Create a cluster with `./scripts/create_k3d_cluster.sh` or `./scripts/create_kind_cluster.sh`.
+- Push local images to the cluster registry with `./scripts/push_images.sh`.
 - Install helm chart with `helm install streamproc ./helm_chart`.
 
 ## Local development
@@ -68,13 +68,12 @@ This is not demonstrated in this repository because it requires a bunch of confi
 
 First, you need to decide if you want to rebuild in the docker container on the cluster or on your local machine.
 
-When you want to rebuild in the docker container you will to mount the source tree from your local machine to the k3d cluster and containers. You then create a separate "dev target" in each Dockerfile that watches the source tree (using [watchexec](https://watchexec.github.io) is recommended), rebuilds from source and restarts the service, or just `go run` from source and restart on change. The advantage is that you don't need to do cross compilation _for_ the container, but the downside is that you need to mount the source tree, which can become a performance issue.
+When you want to rebuild in the docker container you will to mount the source tree from your local machine to the cluster and containers. You then create a separate "dev target" in each Dockerfile that watches the source tree (using [watchexec](https://watchexec.github.io) is recommended), rebuilds from source and restarts the service, or just `go run` from source and restart on change. The advantage is that you don't need to do cross compilation _for_ the container, but the downside is that you need to mount the source tree, which can become a performance issue.
 
-When you want to rebuild on your local machine (_for_ the docker container) you will need to mount the local build artifacts to your k3d cluster and containers. Also for this solution your create a separate "dev target" in each Dockerfile that watches the binary (build artifact(s)) and restarts the service on change (also here running [watchexec](https://watchexec.github.io) in the container is recommended). The local machine then needs to correctly cross compile for the container (`GOOS=<os> GOARCH=<arch> go build`). The advantage is that file watching will not become a performance issue, but the downside is that you need to manage your cross compilation (and OS/arch detection) in scripts.
+When you want to rebuild on your local machine (_for_ the docker container) you will need to mount the local build artifacts to your cluster and containers. Also for this solution your create a separate "dev target" in each Dockerfile that watches the binary (build artifact(s)) and restarts the service on change (also here running [watchexec](https://watchexec.github.io) in the container is recommended). The local machine then needs to correctly cross compile for the container (`GOOS=<os> GOARCH=<arch> go build`). The advantage is that file watching will not become a performance issue, but the downside is that you need to manage your cross compilation (and OS/arch detection) in scripts.
 
 ## TODO
 
 - Implement db storage for consumer-high|low
 - Implement aggregator
 - Implement simple web ui
-- Write script for kind as alt for k3d
