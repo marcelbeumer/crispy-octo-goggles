@@ -74,11 +74,17 @@ func (l *ZapLoggerAdapter) With(args ...any) Logger {
 	return &ZapLoggerAdapter{logger: with}
 }
 
-func NewZapLogger(out io.Writer) *zap.Logger {
+func NewZapLogger(out io.Writer, debug bool) *zap.Logger {
 	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 	writer := zapcore.Lock(zapcore.AddSync(out))
+	var level zapcore.Level
+	if debug {
+		level = zap.DebugLevel
+	} else {
+		level = zap.InfoLevel
+	}
 	levelEnabler := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-		return lvl >= zap.DebugLevel
+		return lvl >= level
 	})
 	core := zapcore.NewCore(encoder, writer, levelEnabler)
 	return zap.New(core)
