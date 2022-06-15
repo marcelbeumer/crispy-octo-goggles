@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/go-playground/streamproc/services/consumer-high/internal/log"
+	"github.com/marcelbeumer/go-playground/streamproc/services/consumer-low/internal/log"
 
 	"encoding/json"
 	"math/big"

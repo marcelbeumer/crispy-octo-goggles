@@ -1,4 +1,4 @@
-module github.com/marcelbeumer/go-playground/streamproc/services/consumer-high
+module github.com/marcelbeumer/go-playground/streamproc/services/consumer-low
 
 go 1.18
 
