@@ -337,13 +337,6 @@ func (s *Server) pumpSql(ctx context.Context) {
 	}
 }
 
-func (s *Server) writeBadRequest(err error, w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(ResponseBody{
-		Message: err.Error(),
-	})
-}
-
 func main() {
 	opts := ServerOpts{}
 	_ = kong.Parse(
