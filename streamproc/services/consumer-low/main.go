@@ -16,17 +16,23 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	influxdbApi "github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/segmentio/kafka-go"
 )
 
 type ServerOpts struct {
-	Watermark  float64 `help:"Number until what is considered low." default:"5.0"       env:"WATERMARK"`
-	Host       string  `help:"API host."                            default:"127.0.0.1" env:"HOST"        short:"h"`
-	Port       int     `help:"API port."                            default:"9996"      env:"PORT"        short:"p"`
-	KafkaHost  string  `help:"Kafka host."                          default:"127.0.0.1" env:"KAFKA_HOST"`
-	KafkaPort  int     `help:"Kafka port."                          default:"9092"      env:"KAFKA_PORT"`
-	KafkaTopic string  `help:"Kafka topic."                         default:"events"    env:"KAFKA_TOPIC"`
-	Debug      bool    `help:"Show debug messages."                                                       short:"d"`
+	Watermark      float64 `help:"Number until what is considered low." default:"5.0"       env:"WATERMARK"`
+	Host           string  `help:"API host."                            default:"127.0.0.1" env:"HOST"            short:"h"`
+	Port           int     `help:"API port."                            default:"9996"      env:"PORT"            short:"p"`
+	KafkaHost      string  `help:"Kafka host."                          default:"127.0.0.1" env:"KAFKA_HOST"`
+	KafkaPort      int     `help:"Kafka port."                          default:"9092"      env:"KAFKA_PORT"`
+	KafkaTopic     string  `help:"Kafka topic."                         default:"events"    env:"KAFKA_TOPIC"`
+	InfluxDBHost   string  `help:"InfluxDB host."                                           env:"INFLUXDB_HOST"`
+	InfluxDBToken  string  `help:"InfluxDB token."                                          env:"INFLUXDB_TOKEN"`
+	InfluxDBOrg    string  `help:"InfluxDB org."                                            env:"INFLUXDB_ORG"`
+	InfluxDBBucket string  `help:"InfluxDB bucket."                                         env:"INFLUXDB_BUCKET"`
+	Debug          bool    `help:"Show debug messages."                                                           short:"d"`
 }
 
 type Event struct {
@@ -75,6 +81,7 @@ type Server struct {
 	buf         EventBuffer
 	logger      log.Logger
 	reader      *kafka.Reader
+	writer      influxdbApi.WriteAPI
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
@@ -96,10 +103,10 @@ func (s *Server) ListenAndServe() error {
 	s.ctx = ctx
 	s.cancel = cancel
 
-	// if err := s.setupInfluxDB(); err != nil {
-	// 	return err
-	// }
-	// logger.Infow("influxDB set up")
+	if err := s.setupInfluxDB(); err != nil {
+		return err
+	}
+	logger.Infow("influxDB set up")
 
 	if err := s.setupKafka(); err != nil {
 		return err
@@ -143,6 +150,13 @@ func (s *Server) setupKafka() error {
 		MaxBytes:  10e6, // 10MB
 	})
 	s.reader.SetOffset(s.startOffset)
+	return nil
+}
+
+func (s *Server) setupInfluxDB() error {
+	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
+	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
+	s.writer = client.WriteAPI(s.opts.InfluxDBOrg, s.opts.InfluxDBBucket)
 	return nil
 }
 
