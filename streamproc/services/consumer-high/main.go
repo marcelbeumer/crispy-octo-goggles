@@ -253,7 +253,7 @@ func (s *Server) pumpKafka(ctx context.Context) {
 			continue
 		}
 
-		m, err := s.reader.ReadMessage(context.Background())
+		m, err := s.reader.ReadMessage(ctx)
 		if err != nil {
 			s.handleStorageError(err, "failed to read message (sleeping before retrying)")
 			continue
