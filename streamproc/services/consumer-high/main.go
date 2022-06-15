@@ -300,22 +300,22 @@ func (s *Server) pumpSql(ctx context.Context) {
 				amounts[i] = v.Amount.String()
 			}
 			query := `
-					INSERT INTO events (time, amount)
-					SELECT * FROM unnest(
-						$1::"timestamp"[],
-						$2::"float8"[]
-					)
-				`
+				INSERT INTO events (time, amount)
+				SELECT * FROM unnest(
+					$1::"timestamp"[],
+					$2::"float8"[]
+				)
+			`
 			if _, err := tx.Exec(s.ctx, query, times, amounts); err != nil {
 				return err
 			}
 
 			query = `
-					INSERT INTO state (name, value)
-					VALUES ($1, $2)
-					ON CONFLICT ON CONSTRAINT state_pkey
-					DO UPDATE SET value = EXCLUDED.value
-				`
+				INSERT INTO state (name, value)
+				VALUES ($1, $2)
+				ON CONFLICT ON CONSTRAINT state_pkey
+				DO UPDATE SET value = EXCLUDED.value
+			`
 			if _, err := tx.Exec(s.ctx, query, "offset", fmt.Sprintf("%d", offset)); err != nil {
 				return err
 			}
