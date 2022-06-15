@@ -25,6 +25,8 @@ timescaledb:
 
 influxdb2:
   adminUser:
+    organization: "influxdata"
+    bucket: "default"
     user: admin
     password: HmoPX3rAsDP7h8ITDhN1KPJXLWNVUdFV
     token: PqAqZGNFKSQIlHSG4uVvSW5PavPNeUIm
