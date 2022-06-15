@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	influxdbApi "github.com/influxdata/influxdb-client-go/v2/api"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -81,7 +82,7 @@ type Server struct {
 	buf         EventBuffer
 	logger      log.Logger
 	reader      *kafka.Reader
-	writer      influxdbApi.WriteAPI
+	writer      influxdbApi.WriteAPIBlocking
 	ctx         context.Context
 	cancel      context.CancelFunc
 }
@@ -156,7 +157,7 @@ func (s *Server) setupKafka() error {
 func (s *Server) setupInfluxDB() error {
 	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
 	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
-	s.writer = client.WriteAPI(s.opts.InfluxDBOrg, s.opts.InfluxDBBucket)
+	s.writer = client.WriteAPIBlocking(s.opts.InfluxDBOrg, s.opts.InfluxDBBucket)
 	return nil
 }
 
@@ -187,7 +188,7 @@ func (s *Server) pumpKafka(ctx context.Context) {
 			continue
 		}
 
-		m, err := s.reader.ReadMessage(context.Background())
+		m, err := s.reader.ReadMessage(ctx)
 		if err != nil {
 			s.handleStorageError(err, "failed to read message (sleeping before retrying)")
 			continue
@@ -223,7 +224,28 @@ func (s *Server) pumpInfluxDb(ctx context.Context) {
 			time.Sleep(time.Second * 2)
 			continue
 		}
-		_ = logger
+
+		t1 := time.Now()
+		points := make([]*write.Point, count)
+		for i, e := range events {
+			points[i] = write.NewPointWithMeasurement("event").
+				AddField("amount", e.Amount).
+				SetTime(time.UnixMilli(e.Time))
+		}
+
+		if err := s.writer.WritePoint(ctx, points...); err != nil {
+			s.buf.Recover(events)
+			s.handleStorageError(err, "influx points write failed, recovered event buffer")
+			continue
+		}
+
+		ms := time.Now().UnixMilli() - t1.UnixMilli()
+		logger.Infow("stored events in database",
+			"eventCount", count,
+			"ms", ms,
+		)
+
+		// TODO
 		_ = offset
 	}
 }
