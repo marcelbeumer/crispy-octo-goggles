@@ -7,5 +7,8 @@ appVersion: "1.16.0"
 
 dependencies:
   - name: kafka
-    repository: https://charts.bitnami.com/bitnami/kafka
+    repository: https://charts.bitnami.com/bitnami
     version: "17.2.5"
+  - name: influxdb2
+    repository: https://helm.influxdata.com
+    version: "2.1.0"

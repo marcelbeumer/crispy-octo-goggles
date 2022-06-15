@@ -1,6 +1,9 @@
 dependencies:
 - name: kafka
-  repository: https://charts.bitnami.com/bitnami/kafka
+  repository: https://charts.bitnami.com/bitnami
   version: 17.2.5
-digest: sha256:0b4bb2c6316e1aa99e6f288143a0b917fb6dc3038fce830fd8ab06261a0fe4c9
-generated: "2022-06-13T22:48:35.171084+02:00"
+- name: influxdb2
+  repository: https://helm.influxdata.com
+  version: 2.1.0
+digest: sha256:50d5d502055628ea3d442b18da37763238af400787d73bec7f258ad6679f5c16
+generated: "2022-06-15T23:05:46.672949+02:00"

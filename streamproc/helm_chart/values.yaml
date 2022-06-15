@@ -23,20 +23,11 @@ timescaledb:
   affinity: {}
   tolerations: {}
 
-influxdb:
-  port: 8086
-  serviceType: ClusterIP
-  storageClassName: ""
-  storage: 100G
-  image:
-    repository: influxdb
-    tag: "2.0.6"
-    pullPolicy: Always
-  imagePullSecrets: []
-  resources: {}
-  nodeSelector: {}
-  affinity: {}
-  tolerations: {}
+influxdb2:
+  adminUser:
+    user: admin
+    password: HmoPX3rAsDP7h8ITDhN1KPJXLWNVUdFV
+    token: PqAqZGNFKSQIlHSG4uVvSW5PavPNeUIm
 
 kafkaSettings:
   port: 9092
