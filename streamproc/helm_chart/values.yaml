@@ -110,6 +110,7 @@ consumerLow:
     # targetMemoryUtilizationPercentage: 80
 
 eventApi:
+  disable: false
   replicaCount: 1
   image:
     repository: streamproc-registry:5000/event-api
@@ -146,6 +147,7 @@ eventApi:
     # targetMemoryUtilizationPercentage: 80
 
 eventProducer:
+  disable: false
   replicaCount: 1
   image:
     repository: streamproc-registry:5000/event-producer

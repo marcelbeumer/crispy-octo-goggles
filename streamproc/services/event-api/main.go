@@ -20,12 +20,13 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type CLI struct {
-	Host       string `help:"API host."    short:"h" default:"127.0.0.1" env:"HOST"`
-	Port       int    `help:"API port."    short:"p" default:"9998"      env:"PORT"`
-	KafkaHost  string `help:"Kafka host."            default:"127.0.0.1" env:"KAFKA_HOST"`
-	KafkaPort  int    `help:"Kafka port."            default:"9092"      env:"KAFKA_PORT"`
-	KafkaTopic string `help:"Kafka topic."           default:"events"    env:"KAFKA_TOPIC"`
+type ServerOpts struct {
+	Host       string `help:"API host."               short:"h" default:"127.0.0.1" env:"HOST"`
+	Port       int    `help:"API port."               short:"p" default:"9998"      env:"PORT"`
+	KafkaHost  string `help:"Kafka host."                       default:"127.0.0.1" env:"KAFKA_HOST"`
+	KafkaPort  int    `help:"Kafka port."                       default:"9092"      env:"KAFKA_PORT"`
+	KafkaTopic string `help:"Kafka topic."                      default:"events"    env:"KAFKA_TOPIC"`
+	Disable    bool   `help:"Disable all processing." short:"x"                     env:"DISABLE"`
 }
 
 type Event struct {
@@ -41,23 +42,25 @@ type ResponseBody struct {
 
 type Server struct {
 	logger log.Logger
+	opts   ServerOpts
 	writer *kafka.Writer
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-func NewServer(logger log.Logger) *Server {
+func NewServer(logger log.Logger, opts ServerOpts) *Server {
 	return &Server{
 		logger: logger,
+		opts:   opts,
 	}
 }
 
-func (s *Server) ListenAndServe(
-	addr string,
-	kafkaAddr string,
-	kafkaTopic string,
-) error {
+func (s *Server) ListenAndServe() error {
+	opts := s.opts
 	logger := s.logger
+	addr := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+	kafkaAddr := fmt.Sprintf("%s:%d", opts.KafkaHost, opts.KafkaPort)
+
 	logger.Infow("starting server", "addr", addr)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -65,7 +68,7 @@ func (s *Server) ListenAndServe(
 	s.cancel = cancel
 	s.writer = kafka.NewWriter(kafka.WriterConfig{
 		Brokers:  []string{kafkaAddr},
-		Topic:    kafkaTopic,
+		Topic:    opts.KafkaTopic,
 		Balancer: &kafka.LeastBytes{},
 	})
 
@@ -101,9 +104,18 @@ func (s *Server) writeBadRequest(
 
 func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger
-	var messages []kafka.Message
 
+	if s.opts.Disable {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(ResponseBody{
+			Message: "processing disabled, did nothing",
+		})
+		return
+	}
+
+	var messages []kafka.Message
 	contentType := r.Header.Get("Content-Type")
+
 	switch contentType {
 
 	// Validates but wastes time with parsing/serializing JSON
@@ -169,9 +181,9 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	cli := CLI{}
+	opts := ServerOpts{}
 	_ = kong.Parse(
-		&cli,
+		&opts,
 		kong.Name("event-api"),
 		kong.UsageOnError(),
 	)
@@ -180,11 +192,9 @@ func main() {
 	log.RedirectStdLog(zl)
 	logger := log.NewZapLoggerAdapter(zl)
 
-	srv := NewServer(logger)
+	srv := NewServer(logger, opts)
 	go func() {
-		addr := fmt.Sprintf("%s:%d", cli.Host, cli.Port)
-		kafkaAddr := fmt.Sprintf("%s:%d", cli.KafkaHost, cli.KafkaPort)
-		if err := srv.ListenAndServe(addr, kafkaAddr, cli.KafkaTopic); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			logger.Errorw("could not start server", log.Error(err))
 			os.Exit(1)
 		}

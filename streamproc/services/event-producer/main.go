@@ -22,6 +22,7 @@ type CLI struct {
 	APIHost   string `help:"API host."                                         short:"h" default:"127.0.0.1" env:"API_HOST"`
 	APIPort   int    `help:"API port."                                         short:"p" default:"9998"      env:"API_PORT"`
 	PlainText bool   `help:"Send events to the API plain text instead of JSON"                               env:"PLAIN_TEXT"`
+	Disable   bool   `help:"Disable all processing."                           short:"x"                     env:"DISABLE"`
 }
 
 type EventBuffer struct {
@@ -104,6 +105,11 @@ func main() {
 					os.Exit(1)
 				}
 				reqBody = j
+			}
+
+			if cli.Disable {
+				logger.Info("processing disabled, not sending events")
+				continue
 			}
 
 			resp, err := http.Post(url, contentType, bytes.NewBuffer(reqBody))
