@@ -242,6 +242,9 @@ func (s *Server) pumpInfluxDb(ctx context.Context) {
 		points := make([]*write.Point, count)
 		for i, e := range events {
 			points[i] = write.NewPointWithMeasurement("event").
+				// Store offset on the point so we don't need seperate storage
+				// just for keeping track of the offset. Yes it's wasteful.
+				AddField("offset", offset).
 				AddField("amount", e.Amount).
 				SetTime(time.UnixMilli(e.Time))
 		}
@@ -260,9 +263,6 @@ func (s *Server) pumpInfluxDb(ctx context.Context) {
 			"eventCount", count,
 			"ms", ms,
 		)
-
-		// TODO
-		_ = offset
 	}
 }
 
