@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	"time"
@@ -37,8 +39,22 @@ type ServerOpts struct {
 	Disable          bool    `help:"Disable all processing."                                  env:"DISABLE"           short:"x"`
 }
 
+type EventType = string
+
+const (
+	EventTypeLow  EventType = "low"
+	EventTypeHigh EventType = "high"
+)
+
+type Event struct {
+	Time   int64      `json:"time"`
+	Amount *big.Float `json:"amount"`
+	Type   EventType  `json:"type"`
+}
+
 type ResponseBody struct {
-	Message string `json:"message"`
+	Message string  `json:"message"`
+	Events  []Event `json:"events"`
 }
 
 type Server struct {
@@ -67,30 +83,55 @@ func (s *Server) ListenAndServe() error {
 	s.ctx = ctx
 	s.cancel = cancel
 
-	if err := s.setupInfluxDB(); err != nil {
-		return err
-	}
-	logger.Infow("influxDB set up")
-
 	if err := s.setupTSDB(); err != nil {
 		return err
 	}
 	logger.Infow("TSDB set up")
 
+	if err := s.setupInfluxDB(); err != nil {
+		return err
+	}
+	logger.Infow("influxDB set up")
+
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
+	r.HandleFunc("/events", s.getEvents).Methods("GET")
 
 	logger.Infow("listening", "addr", addr)
 	return http.ListenAndServe(addr, r)
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
+	logger := s.logger
 	s.cancel()
+	if err := s.tsdbConn.Close(ctx); err != nil {
+		logger.Errorw("failed to close tsdb conn", log.Error(err))
+	}
 }
 
 func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "ok")
+}
+
+func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger
+
+	if s.opts.Disable {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(ResponseBody{
+			Message: "processing disabled, did nothing",
+		})
+		return
+	}
+
+	logger.Info("xxx")
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ResponseBody{
+		Message: "xxx",
+	})
+
 }
 
 func (s *Server) setupTSDB() error {
