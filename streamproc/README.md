@@ -34,6 +34,10 @@ Some strategies for local development with a (local) k8s cluster:
 - Use [telepresence](https://www.telepresence.io) to intercept traffic from/to a service in the cluster to the local machine.
 - Use combination of file mounts and file watchers to initiate rebuilds on code change and automatically restarting services.
 
+Each service implements a `DISABLE` env var (`-x` CLI opt) that disables IO/processing in the cluster so you can do
+that in your local service instead. That's not always neccesary, but can be helpful to prevent the cluster processes to
+impact downstream services while you are making local implementation changes.
+
 ### Helm upgrade after pushing new docker images
 
 Helm chart contains deployment metadata annotations (`{{ now | quote }}` on `spec.template.metadata.annotations.timestamp`).
