@@ -34,6 +34,7 @@ type ServerOpts struct {
 	InfluxDBOrg    string  `help:"InfluxDB org."                                            env:"INFLUXDB_ORG"`
 	InfluxDBBucket string  `help:"InfluxDB bucket."                                         env:"INFLUXDB_BUCKET"`
 	Debug          bool    `help:"Show debug messages."                                                           short:"d"`
+	Disable        bool    `help:"Disable all processing."                                  env:"DISABLE"         short:"x"`
 }
 
 type Event struct {
@@ -104,19 +105,23 @@ func (s *Server) ListenAndServe() error {
 	s.ctx = ctx
 	s.cancel = cancel
 
-	if err := s.setupInfluxDB(); err != nil {
-		return err
-	}
-	logger.Infow("influxDB set up")
+	if opts.Disable {
+		logger.Info("processing disabled")
+	} else {
+		if err := s.setupInfluxDB(); err != nil {
+			return err
+		}
+		logger.Infow("influxDB set up")
 
-	if err := s.setupKafka(); err != nil {
-		return err
-	}
-	logger.Infow("kafka set up",
-		"startOffset", s.startOffset)
+		if err := s.setupKafka(); err != nil {
+			return err
+		}
+		logger.Infow("kafka set up",
+			"startOffset", s.startOffset)
 
-	go s.pumpKafka(ctx)
-	go s.pumpInfluxDb(ctx)
+		go s.pumpKafka(ctx)
+		go s.pumpInfluxDb(ctx)
+	}
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
@@ -157,7 +162,10 @@ func (s *Server) setupKafka() error {
 func (s *Server) setupInfluxDB() error {
 	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
 	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
-	s.writer = client.WriteAPIBlocking(s.opts.InfluxDBOrg, s.opts.InfluxDBBucket)
+	s.writer = client.WriteAPIBlocking(
+		s.opts.InfluxDBOrg,
+		s.opts.InfluxDBBucket,
+	)
 	return nil
 }
 
@@ -183,14 +191,19 @@ func (s *Server) pumpKafka(ctx context.Context) {
 		}
 
 		if s.buf.Len() >= 10000 {
-			logger.Warn("event buffer too full, waiting with reading from kafka")
+			logger.Warn(
+				"event buffer too full, waiting with reading from kafka",
+			)
 			time.Sleep(time.Second * 2)
 			continue
 		}
 
 		m, err := s.reader.ReadMessage(ctx)
 		if err != nil {
-			s.handleStorageError(err, "failed to read message (sleeping before retrying)")
+			s.handleStorageError(
+				err,
+				"failed to read message (sleeping before retrying)",
+			)
 			continue
 		}
 		var event Event
@@ -235,7 +248,10 @@ func (s *Server) pumpInfluxDb(ctx context.Context) {
 
 		if err := s.writer.WritePoint(ctx, points...); err != nil {
 			s.buf.Recover(events)
-			s.handleStorageError(err, "influx points write failed, recovered event buffer")
+			s.handleStorageError(
+				err,
+				"influx points write failed, recovered event buffer",
+			)
 			continue
 		}
 

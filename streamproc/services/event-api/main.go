@@ -52,7 +52,11 @@ func NewServer(logger log.Logger) *Server {
 	}
 }
 
-func (s *Server) ListenAndServe(addr string, kafkaAddr string, kafkaTopic string) error {
+func (s *Server) ListenAndServe(
+	addr string,
+	kafkaAddr string,
+	kafkaTopic string,
+) error {
 	logger := s.logger
 	logger.Infow("starting server", "addr", addr)
 
@@ -84,7 +88,11 @@ func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "ok")
 }
 
-func (s *Server) writeBadRequest(err error, w http.ResponseWriter, r *http.Request) {
+func (s *Server) writeBadRequest(
+	err error,
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	w.WriteHeader(http.StatusBadRequest)
 	json.NewEncoder(w).Encode(ResponseBody{
 		Message: err.Error(),
@@ -135,7 +143,11 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		s.writeBadRequest(fmt.Errorf("unsupported content type %s", contentType), w, r)
+		s.writeBadRequest(
+			fmt.Errorf("unsupported content type %s", contentType),
+			w,
+			r,
+		)
 		return
 	}
 

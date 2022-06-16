@@ -34,6 +34,7 @@ type ServerOpts struct {
 	PostgresUseSSL   string  `help:"Postgres use SSL."                    default:"0"         env:"POSTGRES_USE_SSL"`
 	PostgresDb       string  `help:"Postgres database."                   default:"postgres"  env:"POSTGRES_DB"`
 	Debug            bool    `help:"Show debug messages."                                                             short:"d"`
+	Disable          bool    `help:"Disable all processing."                                  env:"DISABLE"           short:"x"`
 }
 
 type Event struct {
@@ -104,19 +105,23 @@ func (s *Server) ListenAndServe() error {
 	s.ctx = ctx
 	s.cancel = cancel
 
-	if err := s.setupTSDB(); err != nil {
-		return err
-	}
-	logger.Infow("tsdb set up")
+	if opts.Disable {
+		logger.Info("processing disabled")
+	} else {
+		if err := s.setupTSDB(); err != nil {
+			return err
+		}
+		logger.Infow("tsdb set up")
 
-	if err := s.setupKafka(); err != nil {
-		return err
-	}
-	logger.Infow("kafka set up",
-		"startOffset", s.startOffset)
+		if err := s.setupKafka(); err != nil {
+			return err
+		}
+		logger.Infow("kafka set up",
+			"startOffset", s.startOffset)
 
-	go s.pumpKafka(ctx)
-	go s.pumpSql(ctx)
+		go s.pumpKafka(ctx)
+		go s.pumpSql(ctx)
+	}
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
@@ -248,14 +253,19 @@ func (s *Server) pumpKafka(ctx context.Context) {
 		}
 
 		if s.buf.Len() >= 10000 {
-			logger.Warn("event buffer too full, waiting with reading from kafka")
+			logger.Warn(
+				"event buffer too full, waiting with reading from kafka",
+			)
 			time.Sleep(time.Second * 2)
 			continue
 		}
 
 		m, err := s.reader.ReadMessage(ctx)
 		if err != nil {
-			s.handleStorageError(err, "failed to read message (sleeping before retrying)")
+			s.handleStorageError(
+				err,
+				"failed to read message (sleeping before retrying)",
+			)
 			continue
 		}
 		var event Event
@@ -292,40 +302,47 @@ func (s *Server) pumpSql(ctx context.Context) {
 		}
 
 		t1 := time.Now()
-		err := s.tsdbConn.BeginTxFunc(s.ctx, pgx.TxOptions{}, func(tx pgx.Tx) error {
-			times := make([]time.Time, count)
-			amounts := make([]string, count)
-			for i, v := range events {
-				times[i] = time.UnixMilli(v.Time)
-				amounts[i] = v.Amount.String()
-			}
-			query := `
+		err := s.tsdbConn.BeginTxFunc(
+			s.ctx,
+			pgx.TxOptions{},
+			func(tx pgx.Tx) error {
+				times := make([]time.Time, count)
+				amounts := make([]string, count)
+				for i, v := range events {
+					times[i] = time.UnixMilli(v.Time)
+					amounts[i] = v.Amount.String()
+				}
+				query := `
 				INSERT INTO events (time, amount)
 				SELECT * FROM unnest(
 					$1::"timestamp"[],
 					$2::"float8"[]
 				)
 			`
-			if _, err := tx.Exec(s.ctx, query, times, amounts); err != nil {
-				return err
-			}
+				if _, err := tx.Exec(s.ctx, query, times, amounts); err != nil {
+					return err
+				}
 
-			query = `
+				query = `
 				INSERT INTO state (name, value)
 				VALUES ($1, $2)
 				ON CONFLICT ON CONSTRAINT state_pkey
 				DO UPDATE SET value = EXCLUDED.value
 			`
-			if _, err := tx.Exec(s.ctx, query, "offset", fmt.Sprintf("%d", offset)); err != nil {
-				return err
-			}
+				if _, err := tx.Exec(s.ctx, query, "offset", fmt.Sprintf("%d", offset)); err != nil {
+					return err
+				}
 
-			return nil
-		})
+				return nil
+			},
+		)
 
 		if err != nil {
 			s.buf.Recover(events)
-			s.handleStorageError(err, "sql transaction failed, recovered event buffer")
+			s.handleStorageError(
+				err,
+				"sql transaction failed, recovered event buffer",
+			)
 			continue
 		}
 

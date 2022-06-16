@@ -36,6 +36,7 @@ kafkaSettings:
   topic: events
 
 consumerHigh:
+  disable: false
   replicaCount: 1
   image:
     repository: streamproc-registry:5000/consumer-high
@@ -72,6 +73,7 @@ consumerHigh:
     # targetMemoryUtilizationPercentage: 80
 
 consumerLow:
+  disable: false
   replicaCount: 1
   image:
     repository: streamproc-registry:5000/consumer-low
