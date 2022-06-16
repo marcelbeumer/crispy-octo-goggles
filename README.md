@@ -12,3 +12,4 @@ Toying around with Go for my own reference.
 Ideas:
 
 - Implement same app with [sqlc](https://sqlc.dev), [ent](https://entgo.io) and [sqlx](https://github.com/jmoiron/sqlx). Pick migration lib for each case (init and 1+ migration). Document some ideas, pros and cons.
+- Implement dev server with which you can do: `dev-server -p 8080 --static /=./public --proxy /api=http://backend:9000 --proxy /api2=http://backend2:9000`
