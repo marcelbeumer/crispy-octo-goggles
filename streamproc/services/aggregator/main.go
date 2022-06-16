@@ -15,7 +15,7 @@ import (
 
 	"net/http"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 
 	"github.com/gorilla/mux"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -62,7 +62,7 @@ type Server struct {
 	opts     ServerOpts
 	logger   log.Logger
 	influxQ  influxdbApi.QueryAPI
-	tsdbConn *pgx.Conn
+	tsdbPool *pgxpool.Pool
 	ctx      context.Context
 	cancel   context.CancelFunc
 }
@@ -103,11 +103,8 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
-	logger := s.logger
 	s.cancel()
-	if err := s.tsdbConn.Close(ctx); err != nil {
-		logger.Errorw("failed to close tsdb conn", log.Error(err))
-	}
+	s.tsdbPool.Close()
 }
 
 func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
@@ -174,7 +171,7 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 			WHERE time > now() - INTERVAL '%s'
 			GROUP BY bucket
 		`, step, total)
-		rows, err := s.tsdbConn.Query(s.ctx, query)
+		rows, err := s.tsdbPool.Query(s.ctx, query)
 		if err != nil {
 			logger.Error("could not get events from tsdb", log.Error(err))
 			return
@@ -232,14 +229,14 @@ func (s *Server) setupTSDB() error {
 			s.opts.PostgresDb,
 			sslmode,
 		)
-		conn, err := pgx.Connect(s.ctx, pgAddr)
+		conn, err := pgxpool.Connect(s.ctx, pgAddr)
 		if err != nil {
 			msg := "could not connect to database (will retry)"
 			s.logger.Errorw(msg, log.Error(err))
 			time.Sleep(time.Millisecond * 2000)
 			continue
 		}
-		s.tsdbConn = conn
+		s.tsdbPool = conn
 		break
 	}
 
