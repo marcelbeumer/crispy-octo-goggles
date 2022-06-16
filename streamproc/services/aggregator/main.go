@@ -155,7 +155,7 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 			}
 
 			low = append(low, DataPoint{
-				Time:  record.Start().UnixMilli(),
+				Time:  record.Time().UnixMilli(),
 				Count: value,
 				Type:  EventTypeLow,
 			})
