@@ -1,3 +1,19 @@
+// function addData(chart, label, data) {
+//     chart.data.labels.push(label);
+//     chart.data.datasets.forEach((dataset) => {
+//         dataset.data.push(data);
+//     });
+//     chart.update();
+// }
+//
+// function removeData(chart) {
+//     chart.data.labels.pop();
+//     chart.data.datasets.forEach((dataset) => {
+//         dataset.data.pop();
+//     });
+//     chart.update();
+// }
+
 let serverData = {
   message: "ok",
   points: [
@@ -32,7 +48,6 @@ for (const p of serverData.points) {
 }
 
 let colors = ["#ED6D85", "#57A0E5", "#6DBDBF"];
-
 let el = document.getElementById("chart");
 let ctx = el.getContext("2d");
 let myChart = new Chart(ctx, {
