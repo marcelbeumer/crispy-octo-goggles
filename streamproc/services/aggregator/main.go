@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"sync"
 	"time"
 
@@ -128,6 +129,9 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	total := "1h"
+	step := "5m"
+
 	var low []DataPoint
 	go func() {
 		defer wg.Done()
@@ -137,7 +141,7 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 				|> range(start: %s)
 				|> filter(fn: (r) => r._measurement == "event" and r._field == "amount")
 				|> aggregateWindow(every: %s, fn: count)
-		`, s.opts.InfluxDBBucket, "-1h", "5m")
+		`, s.opts.InfluxDBBucket, "-"+total, step)
 
 		res, err := s.influxQ.Query(s.ctx, query)
 		if err != nil {
@@ -163,23 +167,48 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	var high []DataPoint
-	_ = high
 	go func() {
 		defer wg.Done()
+		query := fmt.Sprintf(`
+			SELECT time_bucket('%s', "time") AS bucket, count(amount) FROM events
+			WHERE time > now() - INTERVAL '%s'
+			GROUP BY bucket
+		`, step, total)
+		rows, err := s.tsdbConn.Query(s.ctx, query)
+		if err != nil {
+			logger.Error("could not get events from tsdb", log.Error(err))
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var t time.Time
+			var v int64
+			if err := rows.Scan(&t, &v); err != nil {
+				logger.Error("could not scan tsdb row", log.Error(err))
+				return // give up right away; prevent many more errors
+			}
+			high = append(high, DataPoint{
+				Time:  t.UnixMilli(),
+				Count: v,
+				Type:  EventTypeHigh,
+			})
+		}
 	}()
 
 	wg.Wait()
 
-	var all []DataPoint
+	all := make([]DataPoint, 0, len(low)+len(high))
 	all = append(all, low...)
 	all = append(all, high...)
+	sort.Slice(all, func(a, b int) bool {
+		return all[a].Time < all[b].Time
+	})
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ResponseBody{
 		Message: "ok",
 		Points:  all,
 	})
-
 }
 
 func (s *Server) setupTSDB() error {
