@@ -11,30 +11,30 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/go-playground/streamproc/services/aggregator/internal/log"
 
-	"encoding/json"
 	"math/big"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	influxdbApi "github.com/influxdata/influxdb-client-go/v2/api"
-	"github.com/influxdata/influxdb-client-go/v2/api/write"
-	"github.com/segmentio/kafka-go"
 )
 
 type ServerOpts struct {
-	Watermark      float64 `help:"Number until what is considered low." default:"5.0"       env:"WATERMARK"`
-	Host           string  `help:"API host."                            default:"127.0.0.1" env:"HOST"            short:"h"`
-	Port           int     `help:"API port."                            default:"9996"      env:"PORT"            short:"p"`
-	KafkaHost      string  `help:"Kafka host."                          default:"127.0.0.1" env:"KAFKA_HOST"`
-	KafkaPort      int     `help:"Kafka port."                          default:"9092"      env:"KAFKA_PORT"`
-	KafkaTopic     string  `help:"Kafka topic."                         default:"events"    env:"KAFKA_TOPIC"`
-	InfluxDBHost   string  `help:"InfluxDB host."                                           env:"INFLUXDB_HOST"`
-	InfluxDBToken  string  `help:"InfluxDB token."                                          env:"INFLUXDB_TOKEN"`
-	InfluxDBOrg    string  `help:"InfluxDB org."                                            env:"INFLUXDB_ORG"`
-	InfluxDBBucket string  `help:"InfluxDB bucket."                                         env:"INFLUXDB_BUCKET"`
-	Debug          bool    `help:"Show debug messages."                                                           short:"d"`
-	Disable        bool    `help:"Disable all processing."                                  env:"DISABLE"         short:"x"`
+	Watermark        float64 `help:"Number until what is considered low." default:"5.0"       env:"WATERMARK"`
+	Host             string  `help:"API host."                            default:"127.0.0.1" env:"HOST"              short:"h"`
+	Port             int     `help:"API port."                            default:"9996"      env:"PORT"              short:"p"`
+	PostgresHost     string  `help:"Postgres host."                       default:"127.0.0.1" env:"POSTGRES_HOST"`
+	PostgresPort     int     `help:"Postgres port."                       default:"5432"      env:"POSTGRES_PORT"`
+	PostgresUser     string  `help:"Postgres user."                       default:"user"      env:"POSTGRES_USER"`
+	PostgresPassword string  `help:"Postgres password."                   default:"pass"      env:"POSTGRES_PASSWORD"`
+	PostgresUseSSL   string  `help:"Postgres use SSL."                    default:"0"         env:"POSTGRES_USE_SSL"`
+	PostgresDb       string  `help:"Postgres database."                   default:"postgres"  env:"POSTGRES_DB"`
+	InfluxDBHost     string  `help:"InfluxDB host."                                           env:"INFLUXDB_HOST"`
+	InfluxDBToken    string  `help:"InfluxDB token."                                          env:"INFLUXDB_TOKEN"`
+	InfluxDBOrg      string  `help:"InfluxDB org."                                            env:"INFLUXDB_ORG"`
+	InfluxDBBucket   string  `help:"InfluxDB bucket."                                         env:"INFLUXDB_BUCKET"`
+	Debug            bool    `help:"Show debug messages."                                                             short:"d"`
+	Disable          bool    `help:"Disable all processing."                                  env:"DISABLE"           short:"x"`
 }
 
 type Event struct {
@@ -82,7 +82,6 @@ type Server struct {
 	startOffset int64
 	buf         EventBuffer
 	logger      log.Logger
-	reader      *kafka.Reader
 	writer      influxdbApi.WriteAPIBlocking
 	ctx         context.Context
 	cancel      context.CancelFunc
@@ -131,32 +130,12 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) {
-	logger := s.logger
 	s.cancel()
-
-	if s.reader != nil {
-		if err := s.reader.Close(); err != nil {
-			logger.Errorw("failed to close kafka reader", log.Error(err))
-		}
-	}
 }
 
 func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "ok")
-}
-
-func (s *Server) setupKafka() error {
-	kafkaAddr := fmt.Sprintf("%s:%d", s.opts.KafkaHost, s.opts.KafkaPort)
-	s.reader = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   []string{kafkaAddr},
-		Topic:     s.opts.KafkaTopic,
-		Partition: 0,
-		MinBytes:  10,
-		MaxBytes:  10e6, // 10MB
-	})
-	s.reader.SetOffset(s.startOffset)
-	return nil
 }
 
 func (s *Server) setupInfluxDB() error {
@@ -218,92 +197,6 @@ func (s *Server) handleStorageError(err error, msg string) {
 		"sleepSec", sleepSec,
 	)
 	time.Sleep(time.Second * time.Duration(sleepSec))
-}
-
-func (s *Server) pumpKafka(ctx context.Context) {
-	logger := s.logger
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		if s.buf.Len() >= 10000 {
-			logger.Warn(
-				"event buffer too full, waiting with reading from kafka",
-			)
-			time.Sleep(time.Second * 2)
-			continue
-		}
-
-		m, err := s.reader.ReadMessage(ctx)
-		if err != nil {
-			s.handleStorageError(
-				err,
-				"failed to read message (sleeping before retrying)",
-			)
-			continue
-		}
-		var event Event
-		if err := json.Unmarshal(m.Value, &event); err != nil {
-			s.handleStorageError(err, "failed to parse message")
-			continue
-		}
-
-		amount, _ := event.Amount.Float64()
-		if amount <= s.opts.Watermark {
-			logger.Debugw("have message with low amount",
-				"time", event.Time,
-				"amount", event.Amount.String(),
-			)
-			s.buf.Append(event, s.reader.Offset())
-		}
-	}
-}
-
-func (s *Server) pumpInfluxDb(ctx context.Context) {
-	logger := s.logger
-	for {
-		select {
-		case <-ctx.Done():
-		default:
-		}
-
-		events, offset := s.buf.Flush()
-		count := len(events)
-		if count == 0 {
-			time.Sleep(time.Second * 2)
-			continue
-		}
-
-		t1 := time.Now()
-		points := make([]*write.Point, count)
-		for i, e := range events {
-			points[i] = write.NewPointWithMeasurement("event").
-				// Store offset on the point so we don't need seperate storage
-				// just for keeping track of the offset. Yes it's wasteful.
-				AddField("offset", offset).
-				AddField("amount", e.Amount).
-				SetTime(time.UnixMilli(e.Time))
-		}
-
-		if err := s.writer.WritePoint(ctx, points...); err != nil {
-			s.buf.Recover(events)
-			s.handleStorageError(
-				err,
-				"influx points write failed, recovered event buffer",
-			)
-			continue
-		}
-
-		ms := time.Now().UnixMilli() - t1.UnixMilli()
-		logger.Infow("stored events in database",
-			"eventCount", count,
-			"ms", ms,
-		)
-	}
 }
 
 func main() {
