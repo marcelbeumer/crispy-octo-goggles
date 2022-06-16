@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/marcelbeumer/go-playground/streamproc/services/aggregator/internal/log"
 
-	"math/big"
 	"net/http"
+
+	"github.com/jackc/pgx/v4"
 
 	"github.com/gorilla/mux"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
@@ -37,54 +37,17 @@ type ServerOpts struct {
 	Disable          bool    `help:"Disable all processing."                                  env:"DISABLE"           short:"x"`
 }
 
-type Event struct {
-	Time   int64      `json:"time"`
-	Amount *big.Float `json:"amount"`
-}
-
 type ResponseBody struct {
 	Message string `json:"message"`
 }
 
-type EventBuffer struct {
-	events []Event
-	l      sync.RWMutex
-	offset int64
-}
-
-func (b *EventBuffer) Len() int {
-	return len(b.events)
-}
-
-func (b *EventBuffer) Append(e Event, offset int64) {
-	b.l.Lock()
-	defer b.l.Unlock()
-	b.events = append(b.events, e)
-	b.offset = offset
-}
-
-func (b *EventBuffer) Recover(e []Event) {
-	b.l.Lock()
-	defer b.l.Unlock()
-	b.events = append(e, b.events...)
-}
-
-func (b *EventBuffer) Flush() ([]Event, int64) {
-	b.l.Lock()
-	defer b.l.Unlock()
-	slice := b.events[:]
-	b.events = make([]Event, 0)
-	return slice, b.offset
-}
-
 type Server struct {
-	opts        ServerOpts
-	startOffset int64
-	buf         EventBuffer
-	logger      log.Logger
-	writer      influxdbApi.WriteAPIBlocking
-	ctx         context.Context
-	cancel      context.CancelFunc
+	opts     ServerOpts
+	logger   log.Logger
+	influxQ  influxdbApi.QueryAPI
+	tsdbConn *pgx.Conn
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 func NewServer(logger log.Logger, opts ServerOpts) *Server {
@@ -104,23 +67,15 @@ func (s *Server) ListenAndServe() error {
 	s.ctx = ctx
 	s.cancel = cancel
 
-	// if opts.Disable {
-	// 	logger.Info("processing disabled")
-	// } else {
-	// 	if err := s.setupInfluxDB(); err != nil {
-	// 		return err
-	// 	}
-	// 	logger.Infow("influxDB set up")
-	//
-	// 	if err := s.setupKafka(); err != nil {
-	// 		return err
-	// 	}
-	// 	logger.Infow("kafka set up",
-	// 		"startOffset", s.startOffset)
-	//
-	// 	go s.pumpKafka(ctx)
-	// 	go s.pumpInfluxDb(ctx)
-	// }
+	if err := s.setupInfluxDB(); err != nil {
+		return err
+	}
+	logger.Infow("influxDB set up")
+
+	if err := s.setupTSDB(); err != nil {
+		return err
+	}
+	logger.Infow("TSDB set up")
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
@@ -138,15 +93,7 @@ func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "ok")
 }
 
-func (s *Server) setupInfluxDB() error {
-	logger := s.logger
-	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
-	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
-	s.writer = client.WriteAPIBlocking(
-		s.opts.InfluxDBOrg,
-		s.opts.InfluxDBBucket,
-	)
-
+func (s *Server) setupTSDB() error {
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -154,49 +101,38 @@ func (s *Server) setupInfluxDB() error {
 		default:
 		}
 
-		q := client.QueryAPI(s.opts.InfluxDBOrg)
-
-		query := fmt.Sprintf(`
-			from(bucket: "%s")
-				|> range(start: -1h)
-				|> filter(fn: (r) => r._measurement == "event" and r._field == "offset")
-				|> last()
-		`, s.opts.InfluxDBBucket)
-		res, err := q.Query(s.ctx, query)
-
+		sslmode := "disable"
+		if s.opts.PostgresUseSSL == "1" {
+			sslmode = "require"
+		}
+		pgAddr := fmt.Sprintf(
+			"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
+			s.opts.PostgresUser,
+			s.opts.PostgresPassword,
+			s.opts.PostgresHost,
+			s.opts.PostgresPort,
+			s.opts.PostgresDb,
+			sslmode,
+		)
+		conn, err := pgx.Connect(s.ctx, pgAddr)
 		if err != nil {
-			msg := "could not get last offset (will retry)"
-			logger.Errorw(msg, log.Error(err))
+			msg := "could not connect to database (will retry)"
+			s.logger.Errorw(msg, log.Error(err))
 			time.Sleep(time.Millisecond * 2000)
 			continue
 		}
-
-		for res.Next() {
-			record := res.Record()
-			value, ok := record.Value().(int64)
-			if !ok {
-				return fmt.Errorf(
-					"offset has wrong data type (value: %v)",
-					record.Value(),
-				)
-			}
-			s.startOffset = value
-		}
+		s.tsdbConn = conn
 		break
 	}
 
 	return nil
 }
 
-func (s *Server) handleStorageError(err error, msg string) {
-	logger := s.logger
-	sleepSec := 10
-	logger.Errorw(
-		msg,
-		log.Error(err),
-		"sleepSec", sleepSec,
-	)
-	time.Sleep(time.Second * time.Duration(sleepSec))
+func (s *Server) setupInfluxDB() error {
+	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
+	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
+	s.influxQ = client.QueryAPI(s.opts.InfluxDBOrg)
+	return nil
 }
 
 func main() {
