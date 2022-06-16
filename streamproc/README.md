@@ -78,6 +78,5 @@ When you want to rebuild on your local machine (_for_ the docker container) you 
 
 ## TODO
 
-- Implement db storage for consumer-high|low
 - Implement aggregator
 - Implement simple web ui
