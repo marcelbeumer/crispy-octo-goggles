@@ -160,12 +160,52 @@ func (s *Server) setupKafka() error {
 }
 
 func (s *Server) setupInfluxDB() error {
+	logger := s.logger
 	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
 	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
 	s.writer = client.WriteAPIBlocking(
 		s.opts.InfluxDBOrg,
 		s.opts.InfluxDBBucket,
 	)
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return s.ctx.Err()
+		default:
+		}
+
+		q := client.QueryAPI(s.opts.InfluxDBOrg)
+
+		query := fmt.Sprintf(`
+			from(bucket: "%s")
+				|> range(start: -1h)
+				|> filter(fn: (r) => r._measurement == "event" and r._field == "offset")
+				|> last()
+		`, s.opts.InfluxDBBucket)
+		res, err := q.Query(s.ctx, query)
+
+		if err != nil {
+			msg := "could not get last offset (will retry)"
+			logger.Errorw(msg, log.Error(err))
+			time.Sleep(time.Millisecond * 2000)
+			continue
+		}
+
+		for res.Next() {
+			record := res.Record()
+			value, ok := record.Value().(int64)
+			if !ok {
+				return fmt.Errorf(
+					"offset has wrong data type (value: %v)",
+					record.Value(),
+				)
+			}
+			s.startOffset = value
+		}
+		break
+	}
+
 	return nil
 }
 
