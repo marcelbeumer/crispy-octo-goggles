@@ -12,7 +12,7 @@ if [ -z "$port" ]; then echo "Could not find host port for container $container_
 
 echo ">>> pushing images to $host:$port"
 
-services=( "consumer-high" "consumer-low" "event-api" "event-producer")
+services=( "aggregator" "consumer-high" "consumer-low" "event-api" "event-producer")
 for name in "${services[@]}"
 do
 	echo ">>> pushing image for $name"

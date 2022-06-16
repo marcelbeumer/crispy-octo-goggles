@@ -1,0 +1,20 @@
+{{- $values := .Values.aggregator -}}
+{{- $service := "aggregator" -}}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "helm.fullname" . }}-{{ $service }}
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
+spec:
+  type: {{ $values.service.type }}
+  ports:
+    - port: {{ $values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "helm.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
