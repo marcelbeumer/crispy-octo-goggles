@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -46,15 +46,15 @@ const (
 	EventTypeHigh EventType = "high"
 )
 
-type Event struct {
-	Time   int64      `json:"time"`
-	Amount *big.Float `json:"amount"`
-	Type   EventType  `json:"type"`
+type DataPoint struct {
+	Time  int64     `json:"time"`
+	Count int64     `json:"count"`
+	Type  EventType `json:"type"`
 }
 
 type ResponseBody struct {
-	Message string  `json:"message"`
-	Events  []Event `json:"events"`
+	Message string      `json:"message"`
+	Points  []DataPoint `json:"points"`
 }
 
 type Server struct {
@@ -95,7 +95,7 @@ func (s *Server) ListenAndServe() error {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
-	r.HandleFunc("/events", s.getEvents).Methods("GET")
+	r.HandleFunc("/data", s.getData).Methods("GET")
 
 	logger.Infow("listening", "addr", addr)
 	return http.ListenAndServe(addr, r)
@@ -114,7 +114,7 @@ func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "ok")
 }
 
-func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger
 
 	if s.opts.Disable {
@@ -125,11 +125,59 @@ func (s *Server) getEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info("xxx")
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var low []DataPoint
+	go func() {
+		defer wg.Done()
+
+		query := fmt.Sprintf(`
+			from(bucket: "%s")
+				|> range(start: %s)
+				|> filter(fn: (r) => r._measurement == "event" and r._field == "amount")
+				|> aggregateWindow(every: %s, fn: count)
+		`, s.opts.InfluxDBBucket, "-1h", "5m")
+
+		res, err := s.influxQ.Query(s.ctx, query)
+		if err != nil {
+			logger.Error("could not get events from influx", log.Error(err))
+		}
+
+		for res.Next() {
+			record := res.Record()
+			value, ok := record.Value().(int64)
+			if !ok {
+				logger.Error("offset has wrong data type",
+					"value", record.Value())
+				continue
+			}
+
+			low = append(low, DataPoint{
+				Time:  record.Start().UnixMilli(),
+				Count: value,
+				Type:  EventTypeLow,
+			})
+		}
+
+	}()
+
+	var high []DataPoint
+	_ = high
+	go func() {
+		defer wg.Done()
+	}()
+
+	wg.Wait()
+
+	var all []DataPoint
+	all = append(all, low...)
+	all = append(all, high...)
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(ResponseBody{
-		Message: "xxx",
+		Message: "ok",
+		Points:  all,
 	})
 
 }
