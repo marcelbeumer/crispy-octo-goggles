@@ -34,6 +34,19 @@ spec:
       serviceAccountName: {{ include "helm.serviceAccountName" . }}
       securityContext:
         {{- toYaml $values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: influxdb-init
+          image: influxdb:2.3
+          command: ["sh", "-c", "until influx ping --host http://$INFLUXDB_HOST; do echo waiting for influxdb; sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: {{ include "helm.fullname" . }}-{{ $service }}-init-secrets
+        - name: kafka-init
+          image: edenhill/kcat:1.7.1
+          command: ["sh", "-c", "until kcat -b $KAFKA_HOST:$KAFKA_PORT -L; do echo waiting for kafka; sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: {{ include "helm.fullname" . }}-{{ $service }}-init-secrets
       containers:
         - name: {{ $service }}
           securityContext:
