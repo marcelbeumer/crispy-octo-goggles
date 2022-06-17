@@ -126,8 +126,8 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	total := "1h"
-	step := "5m"
+	total := "10m"
+	step := "10s"
 
 	var low []DataPoint
 	go func() {

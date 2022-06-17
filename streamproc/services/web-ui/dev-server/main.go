@@ -19,8 +19,6 @@ type Opts struct {
 }
 
 func start(opts Opts) error {
-	dir := "../public"
-
 	url, err := url.Parse(opts.BackendUrl)
 	if err != nil {
 		return err
@@ -30,7 +28,7 @@ func start(opts Opts) error {
 
 	r := mux.NewRouter()
 	r.PathPrefix("/api").Handler(http.StripPrefix("/api", proxy))
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir(dir)))
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir(opts.StaticDir)))
 
 	addr := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
 	fmt.Printf("starting dev server on %s\n", addr)
