@@ -1,3 +1,3 @@
 #!/bin/sh
 cd ./dev-server
-go run . "${@}"
+go run . -s ../public "${@}"

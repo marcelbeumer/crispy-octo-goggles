@@ -6,34 +6,46 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/alecthomas/kong"
+	"github.com/gorilla/mux"
 )
 
-// dev-server --host 0.0.0.0 --port 8080 --proxy /api=http://foo.com/api:8080 --proxy /api2=http://bar.copm/api:9090 --static /=../public
+type Opts struct {
+	BackendUrl string `help:"Backend url." env:"BACKEND_URL" short:"b" required:""`
+	Host       string `help:"Host."        env:"HOST"        short:"h"             default:"127.0.0.1"`
+	Port       int    `help:"Port."        env:"PORT"        short:"p"             default:"8080"`
+	StaticDir  string `help:"Static dir."  env:"STATIC_DIR"  short:"s"             default:"../public"`
+}
 
-func proxy() error {
-	host := "127.0.0.1"
-	port := 8888
+func start(opts Opts) error {
 	dir := "../public"
-	backend := "http://kubernetes.docker.internal/api"
-	url, err := url.Parse(backend)
+
+	url, err := url.Parse(opts.BackendUrl)
 	if err != nil {
 		return err
 	}
-
-	http.Handle("/", http.FileServer(http.Dir(dir)))
-
 	proxy := httputil.NewSingleHostReverseProxy(url)
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
-	}
-	http.HandleFunc("/api", handler)
+	fmt.Printf("/api proxy to %s\n", opts.BackendUrl)
 
-	addr := fmt.Sprintf("%s:%d", host, port)
-	return http.ListenAndServe(addr, nil)
+	r := mux.NewRouter()
+	r.PathPrefix("/api").Handler(http.StripPrefix("/api", proxy))
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir(dir)))
+
+	addr := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+	fmt.Printf("starting dev server on %s\n", addr)
+	return http.ListenAndServe(addr, r)
 }
 
 func main() {
-	if err := proxy(); err != nil {
+	opts := Opts{}
+	_ = kong.Parse(
+		&opts,
+		kong.Name("dev-server"),
+		kong.UsageOnError(),
+	)
+
+	if err := start(opts); err != nil {
 		log.Fatal(err)
 	}
 }
