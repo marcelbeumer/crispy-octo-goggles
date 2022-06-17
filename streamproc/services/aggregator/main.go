@@ -96,7 +96,7 @@ func (s *Server) ListenAndServe() error {
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", s.readyProbe).Methods("GET")
-	r.HandleFunc("/data", s.getData).Methods("GET")
+	r.HandleFunc("/api", s.getData).Methods("GET")
 
 	logger.Infow("listening", "addr", addr)
 	return http.ListenAndServe(addr, r)

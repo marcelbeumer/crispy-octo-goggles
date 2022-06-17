@@ -21,7 +21,7 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 ## Setup
 
 - Build local docker images using `./scripts/build_images.sh`.
-- Create a cluster with `./scripts/create_kind_cluster.sh`. Ingress rewriting does not work well with the k3d setup at the moment.
+- Create a cluster with `./scripts/create_k3d_cluster.sh` or `./scripts/create_kind_cluster.sh`.
 - Push local images to the cluster registry with `./scripts/push_images.sh`.
 - Install helm chart with `helm install streamproc ./helm_chart`.
 
@@ -76,7 +76,10 @@ When you want to rebuild in the docker container you will to mount the source tr
 
 When you want to rebuild on your local machine (_for_ the docker container) you will need to mount the local build artifacts to your cluster and containers. Also for this solution your create a separate "dev target" in each Dockerfile that watches the binary (build artifact(s)) and restarts the service on change (also here running [watchexec](https://watchexec.github.io) in the container is recommended). The local machine then needs to correctly cross compile for the container (`GOOS=<os> GOARCH=<arch> go build`). The advantage is that file watching will not become a performance issue, but the downside is that you need to manage your cross compilation (and OS/arch detection) in scripts.
 
+## Improvements
+
+- Currently the web-ui ingress is not rewriting path prefixes, which would be nice. Traefik (k3d) and NGINX ingress (kind) work differently with rewriting, was avoiding the k8s config complexity so far. See [traefik doc here](https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes).
+
 ## TODO
 
 - Write README's for each service.
-- Fix ingress rewrite with k3d.
