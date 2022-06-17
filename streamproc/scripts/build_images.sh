@@ -1,7 +1,7 @@
 #!/bin/sh
 set -o errexit
 
-services=( "aggregator" "consumer-high" "consumer-low" "event-api" "event-producer")
+services=( "aggregator" "consumer-high" "consumer-low" "event-api" "event-producer" "web-ui")
 for name in "${services[@]}"
 do
 	echo ">>> building docker image for $name"
