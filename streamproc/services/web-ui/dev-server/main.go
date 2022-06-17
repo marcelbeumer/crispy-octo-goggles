@@ -27,7 +27,7 @@ func start(opts Opts) error {
 	fmt.Printf("/api proxy to %s\n", opts.BackendUrl)
 
 	r := mux.NewRouter()
-	r.PathPrefix("/api").Handler(http.StripPrefix("/api", proxy))
+	r.PathPrefix("/api").Handler(proxy)
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir(opts.StaticDir)))
 
 	addr := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
