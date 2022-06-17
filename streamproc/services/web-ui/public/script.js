@@ -62,9 +62,9 @@ async function updateData(chart) {
 
 async function main() {
   const chart = createChart();
-  await updateData(chart);
+  await updateData(chart).catch(console.warn);
   setInterval(() => {
-    void updateData(chart);
+    updateData(chart).catch(console.warn);
   }, 5000);
 }
 

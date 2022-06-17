@@ -26,13 +26,6 @@ containerdConfigPatches:
 EOF
 }
 
-container_id=$(docker ps -f name=$registry -l -q)
-if [ "$container_id" ]; then 
-  echo "killing existing container $container_id"
-  docker rm $container_id
-  docker kill $container_id
-fi
-
 # create registry container unless it already exists
 if [ "$(docker inspect -f '{{.State.Running}}' "${registry}" 2>/dev/null || true)" != 'true' ]; then
   docker run \

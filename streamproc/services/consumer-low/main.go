@@ -108,16 +108,14 @@ func (s *Server) ListenAndServe() error {
 	if opts.Disable {
 		logger.Info("processing disabled")
 	} else {
+		s.setupKafka()
+		logger.Infow("kafka set up",
+			"startOffset", s.startOffset)
+
 		if err := s.setupInfluxDB(); err != nil {
 			return err
 		}
 		logger.Infow("influxDB set up")
-
-		if err := s.setupKafka(); err != nil {
-			return err
-		}
-		logger.Infow("kafka set up",
-			"startOffset", s.startOffset)
 
 		go s.pumpKafka(ctx)
 		go s.pumpInfluxDb(ctx)
@@ -146,7 +144,11 @@ func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "ok")
 }
 
-func (s *Server) setupKafka() error {
+func (s *Server) setupKafka() {
+	if s.reader != nil {
+		// Ignore errors.
+		_ = s.reader.Close()
+	}
 	kafkaAddr := fmt.Sprintf("%s:%d", s.opts.KafkaHost, s.opts.KafkaPort)
 	s.reader = kafka.NewReader(kafka.ReaderConfig{
 		Brokers:   []string{kafkaAddr},
@@ -156,7 +158,6 @@ func (s *Server) setupKafka() error {
 		MaxBytes:  10e6, // 10MB
 	})
 	s.reader.SetOffset(s.startOffset)
-	return nil
 }
 
 func (s *Server) setupInfluxDB() error {
@@ -211,7 +212,7 @@ func (s *Server) setupInfluxDB() error {
 
 func (s *Server) handleStorageError(err error, msg string) {
 	logger := s.logger
-	sleepSec := 10
+	sleepSec := 5
 	logger.Errorw(
 		msg,
 		log.Error(err),
@@ -240,10 +241,13 @@ func (s *Server) pumpKafka(ctx context.Context) {
 
 		m, err := s.reader.ReadMessage(ctx)
 		if err != nil {
-			s.handleStorageError(
-				err,
-				"failed to read message (sleeping before retrying)",
-			)
+			msg := "failed to read message (sleeping before retrying)"
+			s.handleStorageError(err, msg)
+			// Unfortunately the kafka client does not gracefull handle
+			// initially not having a connection to the server.
+			// TODO: Worth investigating or replacing the client.
+			// NOTE: Or maybe the issue is specific to kind clusters?
+			s.setupKafka()
 			continue
 		}
 		var event Event
