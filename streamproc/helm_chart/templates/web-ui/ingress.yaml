@@ -1,0 +1,60 @@
+{{- $values := .Values.webUi -}}
+{{- $service := "web-ui" -}}
+{{- $fullName := (print (include "helm.fullname" .) "-" $service) -}}
+{{- $aggregatorName := (print (include "helm.fullname" .) "-aggregator") -}}
+{{- $aggregatorPort := .Values.aggregator.service.port -}}
+{{- $svcPort := $values.service.port -}}
+
+{{- if $values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ $service }}
+  {{- with $values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $values.ingress.className }}
+  ingressClassName: {{ $values.ingress.className }}
+  {{- end }}
+  {{- if $values.ingress.tls }}
+  tls:
+    {{- range $values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range $values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if .pathType }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          {{- end }}
+          # FIXME: can not get rewrite target to work properly for mapping
+          # aggregator to /api/data instead of /data
+          - path: /data
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $aggregatorName }}
+                port:
+                  number: {{ $aggregatorPort }}
+    {{- end }}
+{{- end }}

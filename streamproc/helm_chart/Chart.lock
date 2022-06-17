@@ -1,9 +1,12 @@
 dependencies:
+- name: nginx-ingress
+  repository: https://helm.nginx.com/stable
+  version: 0.13.2
 - name: kafka
   repository: https://charts.bitnami.com/bitnami
   version: 17.2.5
 - name: influxdb2
   repository: https://helm.influxdata.com
   version: 2.1.0
-digest: sha256:50d5d502055628ea3d442b18da37763238af400787d73bec7f258ad6679f5c16
-generated: "2022-06-15T23:05:46.672949+02:00"
+digest: sha256:98d51b90e60b30af9a3c38f22ce84b0daf7c4d9175140436d02bfa409839641a
+generated: "2022-06-17T13:50:02.261424+02:00"

@@ -51,16 +51,6 @@ aggregator:
   service:
     type: ClusterIP
     port: 9995
-  ingress:
-    enabled: false
-    className: ""
-    annotations: {}
-    hosts:
-      - host: chart-example.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-    tls: []
   resources: {}
   nodeSelector: {}
   tolerations: []
@@ -88,16 +78,6 @@ consumerHigh:
   service:
     type: ClusterIP
     port: 9996
-  ingress:
-    enabled: false
-    className: ""
-    annotations: {}
-    hosts:
-      - host: chart-example.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-    tls: []
   resources: {}
   nodeSelector: {}
   tolerations: []
@@ -125,16 +105,6 @@ consumerLow:
   service:
     type: ClusterIP
     port: 9997
-  ingress:
-    enabled: false
-    className: ""
-    annotations: {}
-    hosts:
-      - host: chart-example.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-    tls: []
   resources: {}
   nodeSelector: {}
   tolerations: []
@@ -162,16 +132,6 @@ eventApi:
   service:
     type: ClusterIP
     port: 9998
-  ingress:
-    enabled: false
-    className: ""
-    annotations: {}
-    hosts:
-      - host: chart-example.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-    tls: []
   resources: {}
   nodeSelector: {}
   tolerations: []
@@ -196,6 +156,46 @@ eventProducer:
   podAnnotations: {}
   podSecurityContext: {}
   securityContext: {}
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+
+webUi:
+  disable: false
+  replicaCount: 1
+  image:
+    repository: streamproc-registry:5000/web-ui
+    pullPolicy: Always
+    tag: "latest"
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: true
+    className: ""
+    annotations:
+      # FIXME: can not get rewrite target to work properly for mapping
+      # aggregator to /api/data instead of /data
+      # nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: streamproc.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: []
   resources: {}
   nodeSelector: {}
   tolerations: []

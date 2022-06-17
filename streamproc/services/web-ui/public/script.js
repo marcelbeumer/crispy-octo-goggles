@@ -40,7 +40,7 @@ function createChart() {
 }
 
 async function updateData(chart) {
-  const res = await fetch("/api/data");
+  const res = await fetch("/data");
   const json = await res.json();
   if (json.message !== "ok") {
     throw new Error("fetched server data not ok");
