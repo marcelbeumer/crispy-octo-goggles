@@ -34,6 +34,19 @@ spec:
       serviceAccountName: {{ include "helm.serviceAccountName" . }}
       securityContext:
         {{- toYaml $values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: tsdb-init
+          image: postgres:14.3
+          command: [ "sh", "-c", "until psql -c ''; do echo waiting for tsdb; sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: {{ include "helm.fullname" . }}-{{ $service }}-init-secrets
+        - name: influxdb-init
+          image: influxdb:2.3
+          command: ["sh", "-c", "until influx ping --host http://$INFLUXDB_HOST; do echo waiting for influxdb; sleep 2; done"]
+          envFrom:
+            - secretRef:
+                name: {{ include "helm.fullname" . }}-{{ $service }}-init-secrets
       containers:
         - name: {{ $service }}
           securityContext:

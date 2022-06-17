@@ -1,5 +1,7 @@
 {{- $values := .Values.webUi -}}
 {{- $service := "web-ui" -}}
+{{- $aggregatorName := (print (include "helm.fullname" .) "-aggregator") -}}
+{{- $aggregatorPort := .Values.aggregator.service.port -}}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -34,6 +36,10 @@ spec:
       serviceAccountName: {{ include "helm.serviceAccountName" . }}
       securityContext:
         {{- toYaml $values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: api-init
+          image: curlimages/curl:7.83.1
+          command: [ "sh", "-c", "until curl --connect-timeout 2 http://{{ $aggregatorName }}:{{ $aggregatorPort }}; do echo waiting for api; sleep 2; done"]
       containers:
         - name: {{ $service }}
           securityContext:
