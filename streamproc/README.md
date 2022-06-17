@@ -1,7 +1,5 @@
 # StreamProc
 
-**WARNING: WORK IN PROGRESS, SEE [TODO](#TODO)**
-
 Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local development setup.
 
 - [Event producer](./services/event-producer) that generates events in JSON format of `{ amount: number }`.
@@ -13,17 +11,19 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 
 ## System requirements
 
-- [golang](https://go.dev) >=1.18
-- [docker](https://www.docker.com)
-- [k3d](https://k3d.io) or [kind](https://kind.sigs.k8s.io)
-- [helm](https://helm.sh)
+- [go](https://go.dev) >=1.18
+- [k3d](https://k3d.io) >=5.4.3 or [kind](https://kind.sigs.k8s.io) >=0.14
+- [helm](https://helm.sh) >=3.9.0
 
-## Setup
+## Installation
 
 - Build local docker images using `./scripts/build_images.sh`.
 - Create a cluster with `./scripts/create_k3d_cluster.sh` or `./scripts/create_kind_cluster.sh`.
 - Push local images to the cluster registry with `./scripts/push_images.sh`.
 - Install helm chart with `helm install streamproc ./helm_chart`.
+- Check when pods are ready with `kubectl get po`
+- Add `127.0.0.1 streamproc.local` to your `/etc/hosts` file
+- Open [http://streamproc.local](http://streamproc.local). The graph updates every x-seconds.
 
 ## Local development
 
@@ -78,8 +78,6 @@ When you want to rebuild on your local machine (_for_ the docker container) you 
 
 ## Improvements
 
-- Currently the web-ui ingress is not rewriting path prefixes, which would be nice. Traefik (k3d) and NGINX ingress (kind) work differently with rewriting, was avoiding the k8s config complexity so far. See [traefik doc here](https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes).
-
-## TODO
-
 - Write README's for each service.
+- Time buckets used by the aggregator should be fixed in time and not change on every call/update.
+- Currently the web-ui ingress is not rewriting path prefixes, which would be nice. Traefik (k3d) and NGINX ingress (kind) work differently with rewriting, was avoiding the k8s config complexity so far. See [traefik doc here](https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes).
