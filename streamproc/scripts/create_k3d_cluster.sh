@@ -3,8 +3,6 @@ registry=streamproc-registry
 cluster=streamproc
 nodes=1
 
-k3d registry delete $registry &> /dev/null
-k3d cluster delete $cluster &> /dev/null
 k3d cluster create $cluster \
   -a $nodes \
   --api-port "127.0.0.1:6650" \
