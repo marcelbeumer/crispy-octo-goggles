@@ -79,5 +79,6 @@ When you want to rebuild on your local machine (_for_ the docker container) you 
 ## Improvements
 
 - Write README's for each service.
+- Manage service dependencies with k8s init containers instead of smart Go code.
 - Time buckets used by the aggregator should be fixed in time and not change on every call/update.
 - Currently the web-ui ingress is not rewriting path prefixes, which would be nice. Traefik (k3d) and NGINX ingress (kind) work differently with rewriting, was avoiding the k8s config complexity so far. See [traefik doc here](https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes).
