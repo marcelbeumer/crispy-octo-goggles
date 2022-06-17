@@ -153,11 +153,8 @@ func (s *Server) postEvents(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
-		s.writeBadRequest(
-			fmt.Errorf("unsupported content type %s", contentType),
-			w,
-			r,
-		)
+		msg := fmt.Errorf("unsupported content type %s", contentType)
+		s.writeBadRequest(msg, w, r)
 		return
 	}
 

@@ -106,13 +106,49 @@ func (s *Server) ListenAndServe() error {
 	if opts.Disable {
 		logger.Info("processing disabled")
 	} else {
-		s.setupKafka()
+		kafkaAddr := fmt.Sprintf("%s:%d", s.opts.KafkaHost, s.opts.KafkaPort)
+		s.reader = kafka.NewReader(kafka.ReaderConfig{
+			Brokers:   []string{kafkaAddr},
+			Topic:     s.opts.KafkaTopic,
+			Partition: 0,
+			MinBytes:  10,
+			MaxBytes:  10e6, // 10MB
+		})
+		s.reader.SetOffset(s.startOffset)
 		logger.Infow("kafka set up",
 			"startOffset", s.startOffset)
 
-		if err := s.setupInfluxDB(); err != nil {
+		url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
+		client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
+		s.writer = client.WriteAPIBlocking(
+			s.opts.InfluxDBOrg,
+			s.opts.InfluxDBBucket,
+		)
+		q := client.QueryAPI(s.opts.InfluxDBOrg)
+		query := fmt.Sprintf(`
+			from(bucket: "%s")
+				|> range(start: -1h)
+				|> filter(fn: (r) => r._measurement == "event" and r._field == "offset")
+				|> last()
+		`, s.opts.InfluxDBBucket)
+
+		res, err := q.Query(s.ctx, query)
+		if err != nil {
 			return err
 		}
+
+		for res.Next() {
+			record := res.Record()
+			value, ok := record.Value().(int64)
+			if !ok {
+				return fmt.Errorf(
+					"offset has wrong data type (value: %v)",
+					record.Value(),
+				)
+			}
+			s.startOffset = value
+		}
+
 		logger.Infow("influxDB set up")
 
 		go s.pumpKafka(ctx)
@@ -140,72 +176,6 @@ func (s *Server) Shutdown(ctx context.Context) {
 func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "ok")
-}
-
-func (s *Server) setupKafka() {
-	if s.reader != nil {
-		// Ignore errors.
-		_ = s.reader.Close()
-	}
-	kafkaAddr := fmt.Sprintf("%s:%d", s.opts.KafkaHost, s.opts.KafkaPort)
-	s.reader = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   []string{kafkaAddr},
-		Topic:     s.opts.KafkaTopic,
-		Partition: 0,
-		MinBytes:  10,
-		MaxBytes:  10e6, // 10MB
-	})
-	s.reader.SetOffset(s.startOffset)
-}
-
-func (s *Server) setupInfluxDB() error {
-	logger := s.logger
-	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
-	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
-	s.writer = client.WriteAPIBlocking(
-		s.opts.InfluxDBOrg,
-		s.opts.InfluxDBBucket,
-	)
-
-	for {
-		select {
-		case <-s.ctx.Done():
-			return s.ctx.Err()
-		default:
-		}
-
-		q := client.QueryAPI(s.opts.InfluxDBOrg)
-
-		query := fmt.Sprintf(`
-			from(bucket: "%s")
-				|> range(start: -1h)
-				|> filter(fn: (r) => r._measurement == "event" and r._field == "offset")
-				|> last()
-		`, s.opts.InfluxDBBucket)
-		res, err := q.Query(s.ctx, query)
-
-		if err != nil {
-			msg := "could not get last offset (will retry)"
-			logger.Errorw(msg, log.Error(err))
-			time.Sleep(time.Millisecond * 2000)
-			continue
-		}
-
-		for res.Next() {
-			record := res.Record()
-			value, ok := record.Value().(int64)
-			if !ok {
-				return fmt.Errorf(
-					"offset has wrong data type (value: %v)",
-					record.Value(),
-				)
-			}
-			s.startOffset = value
-		}
-		break
-	}
-
-	return nil
 }
 
 func (s *Server) handleStorageError(err error, msg string) {
@@ -241,11 +211,6 @@ func (s *Server) pumpKafka(ctx context.Context) {
 		if err != nil {
 			msg := "failed to read message (sleeping before retrying)"
 			s.handleStorageError(err, msg)
-			// Unfortunately the kafka client does not gracefull handle
-			// initially not having a connection to the server.
-			// TODO: Worth investigating or replacing the client.
-			// NOTE: Or maybe the issue is specific to kind clusters?
-			s.setupKafka()
 			continue
 		}
 		var event Event
@@ -293,10 +258,8 @@ func (s *Server) pumpInfluxDb(ctx context.Context) {
 
 		if err := s.writer.WritePoint(ctx, points...); err != nil {
 			s.buf.Recover(events)
-			s.handleStorageError(
-				err,
-				"influx points write failed, recovered event buffer",
-			)
+			msg := "influx points write failed, recovered event buffer"
+			s.handleStorageError(err, msg)
 			continue
 		}
 

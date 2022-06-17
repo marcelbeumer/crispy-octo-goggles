@@ -106,12 +106,64 @@ func (s *Server) ListenAndServe() error {
 	if opts.Disable {
 		logger.Info("processing disabled")
 	} else {
-		s.setupKafka()
+		kafkaAddr := fmt.Sprintf("%s:%d", s.opts.KafkaHost, s.opts.KafkaPort)
+		s.reader = kafka.NewReader(kafka.ReaderConfig{
+			Brokers:   []string{kafkaAddr},
+			Topic:     s.opts.KafkaTopic,
+			Partition: 0,
+			MinBytes:  10,
+			MaxBytes:  10e6, // 10MB
+		})
+		s.reader.SetOffset(s.startOffset)
 		logger.Infow("kafka set up",
 			"startOffset", s.startOffset)
 
-		if err := s.setupTSDB(); err != nil {
+		sslmode := "disable"
+		if s.opts.PostgresUseSSL == "1" {
+			sslmode = "require"
+		}
+		pgAddr := fmt.Sprintf(
+			"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
+			s.opts.PostgresUser,
+			s.opts.PostgresPassword,
+			s.opts.PostgresHost,
+			s.opts.PostgresPort,
+			s.opts.PostgresDb,
+			sslmode,
+		)
+		conn, err := pgx.Connect(s.ctx, pgAddr)
+		if err != nil {
 			return err
+		}
+		s.tsdbConn = conn
+		schemaQuery := `
+			CREATE TABLE IF NOT EXISTS state (
+				name TEXT NOT NULL,
+				value TEXT NOT NULL,
+				PRIMARY KEY (name)
+			);
+
+			CREATE TABLE IF NOT EXISTS events (
+				time TIMESTAMPTZ NOT NULL,
+				amount DOUBLE PRECISION
+			);
+
+			SELECT create_hypertable('events', 'time', if_not_exists => true);
+		`
+		if _, err := s.tsdbConn.Exec(s.ctx, schemaQuery); err != nil {
+			return err
+		}
+
+		query := "SELECT value::int8 from state WHERE name = 'offset'"
+		rows, err := s.tsdbConn.Query(s.ctx, query)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		if rows.Next() {
+			if err := rows.Scan(&s.startOffset); err != nil {
+				return err
+			}
 		}
 		logger.Infow("tsdb set up")
 
@@ -148,88 +200,6 @@ func (s *Server) readyProbe(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "ok")
 }
 
-func (s *Server) setupTSDB() error {
-	for {
-		select {
-		case <-s.ctx.Done():
-			return s.ctx.Err()
-		default:
-		}
-
-		sslmode := "disable"
-		if s.opts.PostgresUseSSL == "1" {
-			sslmode = "require"
-		}
-		pgAddr := fmt.Sprintf(
-			"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
-			s.opts.PostgresUser,
-			s.opts.PostgresPassword,
-			s.opts.PostgresHost,
-			s.opts.PostgresPort,
-			s.opts.PostgresDb,
-			sslmode,
-		)
-		conn, err := pgx.Connect(s.ctx, pgAddr)
-		if err != nil {
-			msg := "could not connect to database (will retry)"
-			s.logger.Errorw(msg, log.Error(err))
-			time.Sleep(time.Millisecond * 2000)
-			continue
-		}
-		s.tsdbConn = conn
-		break
-	}
-
-	schemaQuery := `
-		CREATE TABLE IF NOT EXISTS state (
-			name TEXT NOT NULL,
-			value TEXT NOT NULL,
-			PRIMARY KEY (name)
-		);
-
-		CREATE TABLE IF NOT EXISTS events (
-			time TIMESTAMPTZ NOT NULL,
-			amount DOUBLE PRECISION
-		);
-
-		SELECT create_hypertable('events', 'time', if_not_exists => true);
-	`
-
-	if _, err := s.tsdbConn.Exec(s.ctx, schemaQuery); err != nil {
-		return err
-	}
-
-	query := "SELECT value::int8 from state WHERE name = 'offset'"
-	rows, err := s.tsdbConn.Query(s.ctx, query)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	if rows.Next() {
-		if err := rows.Scan(&s.startOffset); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *Server) setupKafka() {
-	if s.reader != nil {
-		// Ignore errors.
-		_ = s.reader.Close()
-	}
-	kafkaAddr := fmt.Sprintf("%s:%d", s.opts.KafkaHost, s.opts.KafkaPort)
-	s.reader = kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   []string{kafkaAddr},
-		Topic:     s.opts.KafkaTopic,
-		Partition: 0,
-		MinBytes:  10,
-		MaxBytes:  10e6, // 10MB
-	})
-	s.reader.SetOffset(s.startOffset)
-}
-
 func (s *Server) handleStorageError(err error, msg string) {
 	logger := s.logger
 	sleepSec := 5
@@ -263,11 +233,6 @@ func (s *Server) pumpKafka(ctx context.Context) {
 		if err != nil {
 			msg := "failed to read message (sleeping before retrying)"
 			s.handleStorageError(err, msg)
-			// Unfortunately the kafka client does not gracefull handle
-			// initially not having a connection to the server.
-			// TODO: Worth investigating or replacing the client.
-			// NOTE: Or maybe the issue is specific to kind clusters?
-			s.setupKafka()
 			continue
 		}
 		var event Event
@@ -315,22 +280,22 @@ func (s *Server) pumpSql(ctx context.Context) {
 					amounts[i] = v.Amount.String()
 				}
 				query := `
-				INSERT INTO events (time, amount)
-				SELECT * FROM unnest(
-					$1::"timestamp"[],
-					$2::"float8"[]
-				)
-			`
+					INSERT INTO events (time, amount)
+					SELECT * FROM unnest(
+						$1::"timestamp"[],
+						$2::"float8"[]
+					)
+				`
 				if _, err := tx.Exec(s.ctx, query, times, amounts); err != nil {
 					return err
 				}
 
 				query = `
-				INSERT INTO state (name, value)
-				VALUES ($1, $2)
-				ON CONFLICT ON CONSTRAINT state_pkey
-				DO UPDATE SET value = EXCLUDED.value
-			`
+					INSERT INTO state (name, value)
+					VALUES ($1, $2)
+					ON CONFLICT ON CONSTRAINT state_pkey
+					DO UPDATE SET value = EXCLUDED.value
+				`
 				if _, err := tx.Exec(s.ctx, query, "offset", fmt.Sprintf("%d", offset)); err != nil {
 					return err
 				}
@@ -341,10 +306,8 @@ func (s *Server) pumpSql(ctx context.Context) {
 
 		if err != nil {
 			s.buf.Recover(events)
-			s.handleStorageError(
-				err,
-				"sql transaction failed, recovered event buffer",
-			)
+			msg := "sql transaction failed, recovered event buffer"
+			s.handleStorageError(err, msg)
 			continue
 		}
 
