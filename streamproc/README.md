@@ -21,7 +21,7 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 ## Setup
 
 - Build local docker images using `./scripts/build_images.sh`.
-- Create a cluster with `./scripts/create_k3d_cluster.sh` or `./scripts/create_kind_cluster.sh`.
+- Create a cluster with `./scripts/create_kind_cluster.sh`. Ingress rewriting does not work well with the k3d setup at the moment.
 - Push local images to the cluster registry with `./scripts/push_images.sh`.
 - Install helm chart with `helm install streamproc ./helm_chart`.
 

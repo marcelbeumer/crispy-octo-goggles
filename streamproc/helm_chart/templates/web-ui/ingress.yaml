@@ -13,10 +13,9 @@ metadata:
   labels:
     {{- include "helm.labels" . | nindent 4 }}
     app.kubernetes.io/component: {{ $service }}
-  {{- with $values.ingress.annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    traefik.ingress.kubernetes.io/rewrite-target: /$1
 spec:
   {{- if $values.ingress.className }}
   ingressClassName: {{ $values.ingress.className }}
@@ -32,29 +31,21 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range $values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: {{ $values.ingress.host | quote }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            {{- if .pathType }}
-            pathType: {{ .pathType }}
-            {{- end }}
+          - path: /(.*)
+            pathType: Prefix
             backend:
               service:
                 name: {{ $fullName }}
                 port:
                   number: {{ $svcPort }}
-          {{- end }}
-          # FIXME: can not get rewrite target to work properly for mapping
-          # aggregator to /api/data instead of /data
-          - path: /data
+          - path: /api(?:/|$)(.*)
             pathType: Prefix
             backend:
               service:
                 name: {{ $aggregatorName }}
                 port:
                   number: {{ $aggregatorPort }}
-    {{- end }}
 {{- end }}

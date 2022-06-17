@@ -26,6 +26,13 @@ containerdConfigPatches:
 EOF
 }
 
+container_id=$(docker ps -f name=$registry -l -q)
+if [ "$container_id" ]; then 
+  echo "killing existing container $container_id"
+  docker rm $container_id
+  docker kill $container_id
+fi
+
 # create registry container unless it already exists
 if [ "$(docker inspect -f '{{.State.Running}}' "${registry}" 2>/dev/null || true)" != 'true' ]; then
   docker run \
@@ -56,3 +63,12 @@ data:
     host: "${registry}:${registry_port}"
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
+
+echo "Installing ingress"
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# echo "Waiting for ingress to be ready"
+# kubectl wait --namespace ingress-nginx \
+#   --for=condition=ready pod \
+#   --selector=app.kubernetes.io/component=controller \
+#   --timeout=90s

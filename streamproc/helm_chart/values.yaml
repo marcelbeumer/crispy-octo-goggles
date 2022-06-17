@@ -186,16 +186,7 @@ webUi:
   ingress:
     enabled: true
     className: ""
-    annotations:
-      # FIXME: can not get rewrite target to work properly for mapping
-      # aggregator to /api/data instead of /data
-      # nginx.ingress.kubernetes.io/rewrite-target: /
-    hosts:
-      - host: streamproc.local
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-    tls: []
+    host: streamproc.local
   resources: {}
   nodeSelector: {}
   tolerations: []
