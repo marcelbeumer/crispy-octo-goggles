@@ -3,20 +3,18 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/go-playground/streamproc/services/event-api/internal/log"
-
-	"encoding/json"
-	"math/big"
-	"net/http"
-
 	"github.com/gorilla/mux"
+	"github.com/marcelbeumer/go-playground/streamproc/services/event-api/internal/log"
 	"github.com/segmentio/kafka-go"
 )
 

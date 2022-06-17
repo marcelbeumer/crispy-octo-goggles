@@ -2,23 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/go-playground/streamproc/services/consumer-low/internal/log"
-
-	"encoding/json"
-	"math/big"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	influxdbApi "github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
+	"github.com/marcelbeumer/go-playground/streamproc/services/consumer-low/internal/log"
 	"github.com/segmentio/kafka-go"
 )
 

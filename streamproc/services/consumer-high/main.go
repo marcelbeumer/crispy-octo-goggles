@@ -2,21 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/go-playground/streamproc/services/consumer-high/internal/log"
-
-	"encoding/json"
-	"math/big"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4"
+	"github.com/marcelbeumer/go-playground/streamproc/services/consumer-high/internal/log"
 	"github.com/segmentio/kafka-go"
 )
 

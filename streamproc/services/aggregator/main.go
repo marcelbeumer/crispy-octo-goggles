@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sort"
@@ -11,15 +12,11 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/marcelbeumer/go-playground/streamproc/services/aggregator/internal/log"
-
-	"net/http"
-
-	"github.com/jackc/pgx/v4/pgxpool"
-
 	"github.com/gorilla/mux"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	influxdbApi "github.com/influxdata/influxdb-client-go/v2/api"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/marcelbeumer/go-playground/streamproc/services/aggregator/internal/log"
 )
 
 type ServerOpts struct {

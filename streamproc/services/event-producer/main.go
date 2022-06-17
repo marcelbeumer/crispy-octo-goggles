@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-
 	"math/big"
 	"math/rand"
 	"net/http"
@@ -13,9 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcelbeumer/go-playground/streamproc/services/event-producer/internal/log"
-
 	"github.com/alecthomas/kong"
+	"github.com/marcelbeumer/go-playground/streamproc/services/event-producer/internal/log"
 )
 
 type CLI struct {
