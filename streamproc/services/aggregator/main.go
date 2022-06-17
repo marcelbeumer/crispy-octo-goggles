@@ -81,14 +81,29 @@ func (s *Server) ListenAndServe() error {
 	s.ctx = ctx
 	s.cancel = cancel
 
-	if err := s.setupTSDB(); err != nil {
-		return err
+	sslmode := "disable"
+	if s.opts.PostgresUseSSL == "1" {
+		sslmode = "require"
 	}
+	pgAddr := fmt.Sprintf(
+		"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
+		s.opts.PostgresUser,
+		s.opts.PostgresPassword,
+		s.opts.PostgresHost,
+		s.opts.PostgresPort,
+		s.opts.PostgresDb,
+		sslmode,
+	)
+	conn, err := pgxpool.Connect(s.ctx, pgAddr)
+	if err != nil {
+		return nil
+	}
+	s.tsdbPool = conn
 	logger.Infow("TSDB set up")
 
-	if err := s.setupInfluxDB(); err != nil {
-		return err
-	}
+	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
+	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
+	s.influxQ = client.QueryAPI(s.opts.InfluxDBOrg)
 	logger.Infow("influxDB set up")
 
 	r := mux.NewRouter()
@@ -203,48 +218,6 @@ func (s *Server) getData(w http.ResponseWriter, r *http.Request) {
 		Message: "ok",
 		Points:  all,
 	})
-}
-
-func (s *Server) setupTSDB() error {
-	for {
-		select {
-		case <-s.ctx.Done():
-			return s.ctx.Err()
-		default:
-		}
-
-		sslmode := "disable"
-		if s.opts.PostgresUseSSL == "1" {
-			sslmode = "require"
-		}
-		pgAddr := fmt.Sprintf(
-			"postgresql://%s:%s@%s:%d/%s?sslmode=%s",
-			s.opts.PostgresUser,
-			s.opts.PostgresPassword,
-			s.opts.PostgresHost,
-			s.opts.PostgresPort,
-			s.opts.PostgresDb,
-			sslmode,
-		)
-		conn, err := pgxpool.Connect(s.ctx, pgAddr)
-		if err != nil {
-			msg := "could not connect to database (will retry)"
-			s.logger.Errorw(msg, log.Error(err))
-			time.Sleep(time.Millisecond * 2000)
-			continue
-		}
-		s.tsdbPool = conn
-		break
-	}
-
-	return nil
-}
-
-func (s *Server) setupInfluxDB() error {
-	url := fmt.Sprintf("http://%s", s.opts.InfluxDBHost)
-	client := influxdb2.NewClient(url, s.opts.InfluxDBToken)
-	s.influxQ = client.QueryAPI(s.opts.InfluxDBOrg)
-	return nil
 }
 
 func main() {
