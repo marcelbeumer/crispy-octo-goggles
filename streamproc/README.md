@@ -78,5 +78,5 @@ When you want to rebuild on your local machine (_for_ the docker container) you 
 
 ## TODO
 
-- Implement simple web ui.
 - Write README's for each service.
+- Fix ingress rewrite with k3d.
