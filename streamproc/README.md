@@ -23,7 +23,7 @@ Basic stream processing exercise and [Kubernetes](https://kubernetes.io) local d
 - Install helm chart with `helm install streamproc ./helm_chart`.
 - Check when pods are ready with `kubectl get po`
 - Add `127.0.0.1 streamproc.local` to your `/etc/hosts` file
-- Open [http://streamproc.local](http://streamproc.local). The graph updates every x-seconds.
+- Open [http://streamproc.local](http://streamproc.local). The graph updates every x-seconds, it may take a while for the first data to show.
 
 ## Local development
 
