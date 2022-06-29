@@ -79,5 +79,7 @@ When you want to rebuild on your local machine (_for_ the docker container) you 
 ## Improvements
 
 - Write README's for each service.
+- Experiment with mTLS (using [linkerd](https://linkerd.io/) probably), enable/disable usage through helm vars.
+- Service role based auth.
 - Time buckets used by the aggregator should be fixed in time and not change on every call/update.
 - Currently the web-ui ingress is not rewriting path prefixes, which would be nice. Traefik (k3d) and NGINX ingress (kind) work differently with rewriting, was avoiding the k8s config complexity so far. See [traefik doc here](https://doc.traefik.io/traefik/migration/v1-to-v2/#strip-and-rewrite-path-prefixes).
