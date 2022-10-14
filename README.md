@@ -2,6 +2,7 @@
 
 Toying around with Go for my own reference.
 
+- [aws-lambda](./aws-lambda) basic AWS lambda example, deployed using terraform.
 - [streamproc](./streamproc) stream processing exercise and kubernetes local dev setup.
 - [gochat](./gochat) chat application using WebSockets, gRPC and a terminal UI.
 - [snippetbox](./snippetbox) example app from the book [Let's Go](https://lets-go.alexedwards.net).
