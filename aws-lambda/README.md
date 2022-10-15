@@ -10,7 +10,7 @@ Basic AWS lambda example, deployed using terraform.
 ## Deploy using terraform
 
 ```bash
-./scripts/zip.sh
+./scripts/build.sh && ./scripts/zip.sh
 terraform init
 terraform apply
 ```
