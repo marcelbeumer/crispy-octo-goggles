@@ -2,15 +2,16 @@
 
 Basic AWS lambda example, deployed using terraform.
 
-- Run `./scripts/build.sh` to build the binary.
-- Run `./scripts/zip.sh` to create a zip from the build.
-- Run `./scripts/upload.sh` to update the lambda by uploading the zip (requires terraform deploy).
-- Run `./scripts/deploy.sh` does build, zip and then upload.
-
-## Deploy using terraform
+Initial deploy:
 
 ```bash
-./scripts/build.sh && ./scripts/zip.sh
+make all
 terraform init
 terraform apply
+```
+
+Afterwads you can build, zip and upload to AWS directly with:
+
+```bash
+make deploy
 ```
