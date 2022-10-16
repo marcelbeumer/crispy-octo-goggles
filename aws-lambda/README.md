@@ -8,7 +8,7 @@ terraform init
 terraform apply
 ```
 
-Afterwards you can build, zip and upload to AWS directly with:
+Afterwards you can build, zip and upload to AWS without running terraform with:
 
 ```bash
 make deploy
