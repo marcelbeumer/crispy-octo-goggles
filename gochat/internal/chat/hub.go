@@ -45,12 +45,12 @@ func (h *Hub) Connect(username string, conn Connection) (hubId, error) {
 	}
 	go func() {
 		if err := h.pumpFromUser(userId); err != nil {
-			h.disconnectUser(userId, err, true)
+			_ = h.disconnectUser(userId, err, true)
 		}
 	}()
 	go func() {
 		if err := h.pumpToUser(userId); err != nil {
-			h.disconnectUser(userId, err, true)
+			_ = h.disconnectUser(userId, err, true)
 		}
 	}()
 	return userId, nil
@@ -77,7 +77,7 @@ func (h *Hub) Close() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			h.disconnectUser(userId, ErrHubClosed, false)
+			_ = h.disconnectUser(userId, ErrHubClosed, false)
 		}()
 	}
 	wg.Wait()
@@ -98,7 +98,7 @@ func (h *Hub) newUser(username string, conn Connection) (hubId, error) {
 		}
 	}
 	events := queue.NewQueue[Event]()
-	events.Add(&EventConnected{ // first event
+	_ = events.Add(&EventConnected{ // first event
 		EventMeta: *NewEventMetaNow(),
 		Users:     h.userList(username),
 	})
@@ -112,11 +112,11 @@ func (h *Hub) newUser(username string, conn Connection) (hubId, error) {
 	defer h.usersMu.Unlock()
 
 	others := h.userIds(userId)
-	h.sendEvent(&EventUserEnter{
+	_ = h.sendEvent(&EventUserEnter{
 		EventMeta: *NewEventMetaNow(),
 		Name:      username,
 	}, others...)
-	h.sendEvent(&EventUserListUpdate{
+	_ = h.sendEvent(&EventUserListUpdate{
 		EventMeta: *NewEventMetaNow(),
 		Users:     h.userList(),
 	}, others...)
@@ -138,11 +138,11 @@ func (h *Hub) disconnectUser(userId hubId, reasonErr error, notify bool) error {
 	if notify {
 		// Notify other users.
 		others := h.userIds(userId)
-		h.sendEvent(&EventUserLeave{
+		_ = h.sendEvent(&EventUserLeave{
 			EventMeta: *NewEventMetaNow(),
 			Name:      user.name,
 		}, others...)
-		h.sendEvent(&EventUserListUpdate{
+		_ = h.sendEvent(&EventUserListUpdate{
 			EventMeta: *NewEventMetaNow(),
 			Users:     h.userList(),
 		}, others...)
@@ -246,7 +246,7 @@ func (h *Hub) handleEvent(userId hubId, e Event) error {
 	case *EventUserLeave:
 		//
 	case *EventSendMessage:
-		h.sendEvent(&EventNewMessage{
+		_ = h.sendEvent(&EventNewMessage{
 			EventMeta: *NewEventMetaNow(),
 			Sender:    user.name,
 			Message:   t.Message,
@@ -271,7 +271,7 @@ func (h *Hub) sendEvent(e Event, userIds ...hubId) error {
 			return err
 		}
 		if err := user.events.Add(e); err != nil {
-			h.disconnectUser(userId, err, true) // unforgiving
+			_ = h.disconnectUser(userId, err, true) // unforgiving
 			return err
 		}
 	}

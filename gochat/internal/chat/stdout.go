@@ -21,8 +21,8 @@ func (f *StdoutFrontend) Start() error {
 	defer close(stop)
 	var err error
 	select {
-	case err = <-channel.FnChan(func() error { return f.pumpEvents(stop) }):
-	case err = <-channel.FnChan(func() error { return f.pumpStdin(stop) }):
+	case err = <-channel.FnToChan(func() error { return f.pumpEvents(stop) }):
+	case err = <-channel.FnToChan(func() error { return f.pumpStdin(stop) }):
 	}
 	return err
 }

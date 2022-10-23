@@ -76,8 +76,8 @@ func (f *GUIFrontend) Start() error {
 	})
 
 	select {
-	case err = <-channel.FnChan(func() error { return f.guiPump() }):
-	case err = <-channel.FnChan(func() error {
+	case err = <-channel.FnToChan(func() error { return f.guiPump() }):
+	case err = <-channel.FnToChan(func() error {
 		<-layoutReady
 		return f.eventPump(stop)
 	}):
@@ -99,54 +99,55 @@ func (f *GUIFrontend) eventPump(stop <-chan struct{}) error {
 		case <-stop:
 			return nil
 		default:
-			logger := f.logger
-			e, err := f.conn.ReadEvent()
-			if err != nil {
+		}
+
+		logger := f.logger
+		e, err := f.conn.ReadEvent()
+		if err != nil {
+			return err
+		}
+
+		switch t := e.(type) {
+		case *EventConnected:
+			if err := f.setUsers(t.Users); err != nil {
 				return err
 			}
-
-			switch t := e.(type) {
-			case *EventConnected:
-				if err := f.setUsers(t.Users); err != nil {
-					return err
-				}
-			case *EventUserListUpdate:
-				if err := f.setUsers(t.Users); err != nil {
-					return err
-				}
-			case *EventUserEnter:
-				msg := fmt.Sprintf(
-					"[%s] <<user \"%s\" entered the room>>",
-					t.Time.Local(),
-					t.Name,
-				)
-				if err := f.addMessageLine(msg); err != nil {
-					return err
-				}
-			case *EventUserLeave:
-				msg := fmt.Sprintf(
-					"[%s] <<user \"%s\" left the room>>",
-					t.Time.Local(),
-					t.Name,
-				)
-				if err := f.addMessageLine(msg); err != nil {
-					return err
-				}
-			case *EventNewMessage:
-				msg := fmt.Sprintf(
-					"[%s %s] >> %s",
-					t.Time.Local(),
-					t.Sender,
-					t.Message,
-				)
-				if err := f.addMessageLine(msg); err != nil {
-					return err
-				}
-			default:
-				logger.Warnw(
-					"unhandled event type",
-					"type", reflect.TypeOf(e).String())
+		case *EventUserListUpdate:
+			if err := f.setUsers(t.Users); err != nil {
+				return err
 			}
+		case *EventUserEnter:
+			msg := fmt.Sprintf(
+				"[%s] <<user \"%s\" entered the room>>",
+				t.Time.Local(),
+				t.Name,
+			)
+			if err := f.addMessageLine(msg); err != nil {
+				return err
+			}
+		case *EventUserLeave:
+			msg := fmt.Sprintf(
+				"[%s] <<user \"%s\" left the room>>",
+				t.Time.Local(),
+				t.Name,
+			)
+			if err := f.addMessageLine(msg); err != nil {
+				return err
+			}
+		case *EventNewMessage:
+			msg := fmt.Sprintf(
+				"[%s %s] >> %s",
+				t.Time.Local(),
+				t.Sender,
+				t.Message,
+			)
+			if err := f.addMessageLine(msg); err != nil {
+				return err
+			}
+		default:
+			logger.Warnw(
+				"unhandled event type",
+				"type", reflect.TypeOf(e).String())
 		}
 	}
 }
@@ -229,7 +230,7 @@ func (f *GUIFrontend) newManagerFunc(onReady func()) gocui.ManagerFunc {
 }
 
 func (f *GUIFrontend) activateView(g *gocui.Gui, v *gocui.View) error {
-	g.SetCurrentView(v.Name())
+	_, _ = g.SetCurrentView(v.Name())
 	for _, v := range g.Views() {
 		if g.CurrentView() == v {
 			v.SelFgColor = gocui.ColorRed
@@ -271,7 +272,7 @@ func (f *GUIFrontend) sendMessageFromInput(g *gocui.Gui, v *gocui.View) error {
 	if err != nil {
 		return err
 	}
-	f.conn.SendEvent(&EventSendMessage{
+	_ = f.conn.SendEvent(&EventSendMessage{
 		EventMeta: *NewEventMetaNow(),
 		Message:   string(bytes),
 	})

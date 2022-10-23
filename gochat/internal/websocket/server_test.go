@@ -80,7 +80,7 @@ func TestServer(t *testing.T) {
 		require.NoError(t, err)
 		defer wsConn.Close()
 
-		wsConn.SetReadDeadline(time.Now().Add(time.Second))
+		_ = wsConn.SetReadDeadline(time.Now().Add(time.Second))
 		messageType, p, err := wsConn.ReadMessage()
 		require.NoError(t, err)
 		require.Equal(t, websocket.TextMessage, messageType)
@@ -89,12 +89,12 @@ func TestServer(t *testing.T) {
 
 		nowStub.Inc()
 		msg = `{"name":"sendMessage","data":{"time":"1970-01-01T01:00:02+01:00","message":"Hello"}}`
-		wsConn.SetWriteDeadline(time.Now().Add(time.Second))
+		_ = wsConn.SetWriteDeadline(time.Now().Add(time.Second))
 		err = wsConn.WriteMessage(websocket.TextMessage, []byte(msg))
 		require.NoError(t, err)
 
 		nowStub.Inc()
-		wsConn.SetReadDeadline(time.Now().Add(time.Second))
+		_ = wsConn.SetReadDeadline(time.Now().Add(time.Second))
 		messageType, p, err = wsConn.ReadMessage()
 		require.NoError(t, err)
 		require.Equal(t, websocket.TextMessage, messageType)

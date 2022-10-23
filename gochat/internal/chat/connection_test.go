@@ -42,7 +42,9 @@ func TestNewTestConnectionUsesPassedOutCh(t *testing.T) {
 	chOut := make(chan Event)
 	c := NewTestConnection(chIn, chOut)
 	testEvent := &TestEvent{}
-	go c.SendEvent(testEvent)
+	go func() {
+		_ = c.SendEvent(testEvent)
+	}()
 
 	event, err := test.ChTimeout(t, chOut)
 	require.NoError(t, err)

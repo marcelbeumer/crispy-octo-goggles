@@ -15,14 +15,14 @@ func skip_TestFnChRunsPassedFnInGoroutine(t *testing.T) {
 		isCalled = true
 		return nil
 	}
-	FnChan(fn)
+	FnToChan(fn)
 	assert.Equal(t, false, isCalled)
 }
 
 func TestFnChReturnsFnResultInChannel(t *testing.T) {
 	expected := 1234
 	fn := func() int { return expected }
-	ch := FnChan(fn)
+	ch := FnToChan(fn)
 
 	result, err := test.ChTimeout(t, ch)
 	require.NoError(t, err)
@@ -32,7 +32,7 @@ func TestFnChReturnsFnResultInChannel(t *testing.T) {
 
 func TestFnChClosesReturnCh(t *testing.T) {
 	fn := func() int { return 1 }
-	ch := FnChan(fn)
+	ch := FnToChan(fn)
 
 	v1, err := test.ChTimeout(t, ch)
 	require.NoError(t, err)

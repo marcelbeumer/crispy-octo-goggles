@@ -62,7 +62,7 @@ func (s *Server) Start(addr string) error {
 		hub:    *chat.NewHub(logger),
 	})
 
-	s.grpcServer.Serve(lis)
+	_ = s.grpcServer.Serve(lis)
 	return err
 }
 

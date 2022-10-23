@@ -68,7 +68,9 @@ func (s *Server) handleHttp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer conn.Close(nil)
-	defer s.hub.Disconnect(userId)
+	defer func() {
+		_ = s.hub.Disconnect(userId)
+	}()
 
 	if err := conn.Wait(); err != nil {
 		logger.Errorw(

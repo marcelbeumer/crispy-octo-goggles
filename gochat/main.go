@@ -52,7 +52,7 @@ func main() {
 		logger := log.NewZapLoggerAdapter(zl)
 
 		exit := func(code int) {
-			zl.Sync()
+			_ = zl.Sync()
 			stdErrBuf.Flush()
 			os.Exit(code)
 		}
@@ -106,7 +106,7 @@ func main() {
 		log.RedirectStdLog(zl)
 		logger := log.NewZapLoggerAdapter(zl)
 		exit := func(code int) {
-			zl.Sync()
+			_ = zl.Sync()
 			os.Exit(code)
 		}
 
