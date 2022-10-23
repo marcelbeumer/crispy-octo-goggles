@@ -74,8 +74,8 @@ func (h *Hub) Close() error {
 	var wg sync.WaitGroup
 	for _, userId := range h.userIds() {
 		userId := userId
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 			h.disconnectUser(userId, ErrHubClosed, false)
 		}()
@@ -124,7 +124,7 @@ func (h *Hub) newUser(username string, conn Connection) (hubId, error) {
 	return userId, nil
 }
 
-func (h *Hub) disconnectUser(userId hubId, err error, notify bool) error {
+func (h *Hub) disconnectUser(userId hubId, reasonErr error, notify bool) error {
 	h.usersMu.Lock()
 	defer h.usersMu.Unlock()
 

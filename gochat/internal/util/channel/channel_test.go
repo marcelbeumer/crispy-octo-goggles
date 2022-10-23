@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//lint:ignore U1000 will do later
 func skip_TestFnChRunsPassedFnInGoroutine(t *testing.T) {
 	var isCalled bool
 	fn := func() any {

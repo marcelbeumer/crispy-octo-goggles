@@ -35,6 +35,9 @@ func TestHubConnectUserEvents(t *testing.T) {
 
 	g.Go(func() error {
 		_, err := hub.Connect("user1", user1Conn)
+		if err != nil {
+			return err
+		}
 		<-didUser1Connect
 		_, err = hub.Connect("user2", user2Conn)
 		return err

@@ -2,7 +2,7 @@ package chat
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"reflect"
 	"sync"
 
@@ -263,8 +263,11 @@ func (f *GUIFrontend) nextView(g *gocui.Gui, v *gocui.View) error {
 }
 
 func (f *GUIFrontend) sendMessageFromInput(g *gocui.Gui, v *gocui.View) error {
-	v, err := g.View("input")
-	bytes, err := ioutil.ReadAll(v)
+	input, err := g.View("input")
+	if err != nil {
+		return err
+	}
+	bytes, err := io.ReadAll(v)
 	if err != nil {
 		return err
 	}
@@ -272,7 +275,7 @@ func (f *GUIFrontend) sendMessageFromInput(g *gocui.Gui, v *gocui.View) error {
 		EventMeta: *NewEventMetaNow(),
 		Message:   string(bytes),
 	})
-	v.Clear()
+	input.Clear()
 	return err
 }
 
