@@ -1,0 +1,8 @@
+sandbox:
+  enabled: true
+supergraph:
+  introspection: true
+homepage:
+  enabled: false
+include_subgraph_errors:
+  all: true

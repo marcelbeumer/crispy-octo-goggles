@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  content:
+    build: ./services/content
+    environment:
+      - HOST=0.0.0.0
+    ports:
+      - "4001:4001"
+  commerce:
+    build: ./services/commerce
+    environment:
+      - HOST=0.0.0.0
+    ports:
+      - "4002:4002"
+  router:
+    build: ./services/router
+    ports:
+      - "4000:4000"
+    environment:
+      - CONTENT_URL=http://content:4001/query
+      - COMMERCE_URL=http://commerce:4002/query
+    depends_on:
+      - commerce
+      - content

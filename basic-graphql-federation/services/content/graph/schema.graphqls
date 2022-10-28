@@ -1,0 +1,16 @@
+extend schema
+  @link(url: "https://specs.apollo.dev/federation/v2.0", import: ["@key"])
+
+type Content {
+  title: String
+  description: String
+  products: [Product!]!
+}
+
+type Product @key(fields: "sku") {
+  sku: String!
+}
+
+type Query {
+  topProducts(limit: Int): Content
+}
