@@ -2,6 +2,7 @@
 
 Toying around with Go for my own reference.
 
+- [basic-graphql-federation](./basic-graphql-federation) basic GraphQL federation 2 example using Apollo Router and Go services written with [gqlgen](https://gqlgen.com/).
 - [aws-lambda](./aws-lambda) basic AWS lambda example, deployed using terraform.
 - [streamproc](./streamproc) stream processing exercise and kubernetes local dev setup.
 - [gochat](./gochat) chat application using WebSockets, gRPC and a terminal UI.
