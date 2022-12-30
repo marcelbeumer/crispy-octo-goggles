@@ -1,0 +1,4 @@
+package ratelimiter
+
+func Foo() {
+}
