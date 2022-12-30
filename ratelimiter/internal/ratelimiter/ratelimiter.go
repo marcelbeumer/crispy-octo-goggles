@@ -1,4 +1,0 @@
-package ratelimiter
-
-func Foo() {
-}
