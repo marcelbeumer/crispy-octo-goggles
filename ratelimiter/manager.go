@@ -9,6 +9,10 @@ import (
 	"sync"
 )
 
+// HTTPManager is a rate limiter manager for HTTP requests.
+// It creates middleware using .Handler() and .HandlerFunc().
+// It uses a LimiterFactory to create a new Limiter for each IP address.
+// WARNING: there is no cleanup of the limiter map and there is no limit on the number of entries.
 type HTTPManager struct {
 	// mu protects the lims map.
 	mu sync.Mutex
