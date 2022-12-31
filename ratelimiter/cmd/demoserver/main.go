@@ -23,8 +23,13 @@ func main() {
 	flag.Parse()
 
 	xtimeManager := ratelimiter.NewHTTPManager(context.Background(), rate, burst, ratelimiter.XtimeLimiterFactory)
+	uberManager := ratelimiter.NewHTTPManager(context.Background(), rate, burst, ratelimiter.UberLimiterFactory)
 
 	http.Handle("/xtime", xtimeManager.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello world! (x/time/rate)")
+	}))
+
+	http.Handle("/uber", uberManager.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello world! (x/time/rate)")
 	}))
 
