@@ -13,12 +13,16 @@ import (
 func main() {
 	var host string
 	var port int
+	var rate float64
+	var burst int
 
 	flag.StringVar(&host, "host", "", "host to listen on")
 	flag.IntVar(&port, "port", 8080, "port to listen on")
+	flag.Float64Var(&rate, "rate", 1, "rate limit in requests per second")
+	flag.IntVar(&burst, "burst", 1, "burst size")
 	flag.Parse()
 
-	xtimeManager := ratelimiter.NewHTTPManager(context.Background(), 1, 1, ratelimiter.XtimeLimiterFactory)
+	xtimeManager := ratelimiter.NewHTTPManager(context.Background(), rate, burst, ratelimiter.XtimeLimiterFactory)
 
 	http.Handle("/xtime", xtimeManager.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello world! (x/time/rate)")
