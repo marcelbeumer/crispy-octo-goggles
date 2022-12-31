@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/marcelbeumer/go-playground/ratelimiter"
 )
 
 func main() {
@@ -15,9 +18,11 @@ func main() {
 	flag.IntVar(&port, "port", 8080, "port to listen on")
 	flag.Parse()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello world!")
-	})
+	xtimeManager := ratelimiter.NewHTTPManager(context.Background(), 1, 1, ratelimiter.XtimeLimiterFactory)
+
+	http.Handle("/xtime", xtimeManager.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello world! (x/time/rate)")
+	}))
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	fmt.Printf("Starting server on %s\n", addr)

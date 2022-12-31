@@ -24,9 +24,7 @@ type HTTPManager struct {
 	factory LimiterFactory
 }
 
-type LimiterFactory interface {
-	NewLimiter(rate float64, burst int) Limiter
-}
+type LimiterFactory func(rate float64, burst int) Limiter
 
 func NewHTTPManager(ctx context.Context, rate float64, b int, factory LimiterFactory) *HTTPManager {
 	return &HTTPManager{
@@ -56,12 +54,16 @@ func (man *HTTPManager) Handler(next http.Handler) http.Handler {
 	})
 }
 
+func (man *HTTPManager) HandlerFunc(next http.HandlerFunc) http.Handler {
+	return man.Handler(http.HandlerFunc(next))
+}
+
 func (man *HTTPManager) getLimiter(ip string) Limiter {
 	man.mu.Lock()
 	defer man.mu.Unlock()
 	limiter, ok := man.lims[ip]
 	if !ok {
-		limiter = man.factory.NewLimiter(man.rate, man.burst)
+		limiter = man.factory(man.rate, man.burst)
 		man.lims[ip] = limiter
 	}
 	return limiter
