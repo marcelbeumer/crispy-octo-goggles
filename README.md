@@ -10,6 +10,7 @@ Toying around with Go for my own reference.
 - [typednil](./typednil) understanding the infamous typed nils.
 - [typeswitch](./typeswitch) playing with typeswitches.
 - [websockets](./websockets) hello-worldish WebSockets.
+- [jsonparse](./jsonparse) parsing json.
 - [yamlparse](./yamlparse) parsing yaml.
 
 Ideas:

@@ -2,9 +2,9 @@
   "type": "a",
   "contents": {
     "propForTypeA": "valueForTypeA"
-  }
+  },
   "miscForA": {
-    "prop1": "value1"
+    "prop1": "value1",
     "prop2": "value2"
   }
 }
