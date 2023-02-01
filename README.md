@@ -3,9 +3,10 @@
 Toying around with Go for my own reference.
 
 - [basic-graphql-federation](./basic-graphql-federation) basic Apollo Federation 2 example with Go services written with [gqlgen](https://gqlgen.com/).
-- [aws-lambda](./aws-lambda) basic AWS lambda example, deployed using terraform.
 - [streamproc](./streamproc) stream processing exercise and kubernetes local dev setup.
 - [gochat](./gochat) chat application using WebSockets, gRPC and a terminal UI.
+- [jsonclientserver](./jsonclientserver) simple HTTP client/server sending/receiving JSON.
+- [aws-lambda](./aws-lambda) basic AWS lambda example, deployed using terraform.
 - [snippetbox](./snippetbox) example app from the book [Let's Go](https://lets-go.alexedwards.net).
 - [typednil](./typednil) understanding the infamous typed nils.
 - [typeswitch](./typeswitch) playing with typeswitches.
